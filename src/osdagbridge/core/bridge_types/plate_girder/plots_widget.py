@@ -13,11 +13,13 @@ import webbrowser
 
 from analysis_results import PlateGirderAnalysisResults
 from osdagbridge.core.bridge_types.plate_girder.analyser import BridgeGrillageModel
+
 CURRENT_LOADCASE = None
 
 # ============================================================
 # MODEL + ANALYSIS (DATA FROM ANALYSER)
 # ============================================================
+
 model = BridgeGrillageModel()
 model.create_model()
 
@@ -32,12 +34,12 @@ model.create_median_load()
 
 # ---------- RUN ANALYSIS ----------
 model.analyze()
-
 # ---------- GET DATASET FROM ANALYSER ----------
 ds = model.dataset
 CURRENT_LOADCASE = ds.coords["Loadcase"].values[2]
-print(type(ds))
-print(ds)
+if __name__ == "__main__":
+    print(type(ds))
+    print(ds)
 
 # ============================================================
 # RESULT HANDLER + GIRDER BUILD
@@ -94,7 +96,7 @@ for g, data in girder_map.items():
     girder_map[g]["elements"] = valid_elems
 
 
-print("Girders found →", girder_map.keys())
+# print("Girders found →", girder_map.keys())
 
 
 # ============================================================
