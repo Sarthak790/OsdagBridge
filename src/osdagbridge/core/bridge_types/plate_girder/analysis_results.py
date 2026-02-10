@@ -359,7 +359,7 @@ class PlateGirderAnalysisResults:
             # ======================================================
             if main_choice == "2":
 
-                girder_map, elements = self.build_girders()
+                girder_map, elements = self.build_girders(verbose=False)
                 loadcases = self.get_available_loadcases()
 
                 component_map = {
