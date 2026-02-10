@@ -176,29 +176,6 @@ class PlateGirderAnalysisResults:
 
         return dist
 
-
-    def get_elements_along_path(self, path, elements):
-        """
-        Returns:
-        - list of element IDs along the girder
-        - connectivity info for printing
-        """
-
-        path_elements = []
-        element_map = []
-
-        for eid, conn in elements.items():
-            if len(conn) != 2:
-                continue
-
-            n1, n2 = conn
-
-            # element lies on girder if both nodes are in BFS path
-            if n1 in path and n2 in path:
-                path_elements.append(eid)
-                element_map.append((eid, n1, n2))
-
-        return path_elements, element_map
     # ========================================================
     # BUILD LOGICAL GIRDERS (g1, g2, g3...)
     # ========================================================
