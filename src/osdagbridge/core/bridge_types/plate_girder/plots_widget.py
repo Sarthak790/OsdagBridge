@@ -35,8 +35,7 @@ model.analyze()
 
 # ---------- GET DATASET FROM ANALYSER ----------
 ds = model.dataset
-CURRENT_LOADCASE = ds.coords["Loadcase"].values[0]
-
+CURRENT_LOADCASE = ds.coords["Loadcase"].values[2]
 print(type(ds))
 print(ds)
 
