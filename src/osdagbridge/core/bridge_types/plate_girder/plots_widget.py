@@ -3,7 +3,8 @@ import os
 
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QRadioButton, QButtonGroup
+    QRadioButton, QButtonGroup,
+    QLabel, QComboBox, QCheckBox
 )
 
 
@@ -37,6 +38,24 @@ model.analyze()
 # ---------- GET DATASET FROM ANALYSER ----------
 ds = model.dataset
 CURRENT_LOADCASE = ds.coords["Loadcase"].values[2]
+
+# ================= LOADCASES =================
+LOADCASES = list(ds.coords["Loadcase"].values)
+
+# ================= FORCE MAP =================
+FORCE_MAP = {
+    "Fx": ("Vx_i", "Vx_j"),
+    "Fy": ("Vy_i", "Vy_j"),
+    "Fz": ("Vz_i", "Vz_j"),
+    "Mx": ("Mx_i", "Mx_j"),
+    "My": ("My_i", "My_j"),
+    "Mz": ("Mz_i", "Mz_j"),
+}
+
+def get_ds(loadcase):
+    return ds.sel(Loadcase=loadcase)
+
+
 if __name__ == "__main__":
     print(type(ds))
     print(ds)
@@ -103,13 +122,14 @@ for g, data in girder_map.items():
 # TEMP HTML
 # ============================================================
 TEMP_HTML = os.path.abspath("temp_plot.html")
+import webbrowser
 
 def open_plot():
     webbrowser.open("file://" + TEMP_HTML)
 # ============================================================
 # SFD (UNCHANGED)
-def build_figure_sfd():
-    LOADCASE = CURRENT_LOADCASE or ds.coords["Loadcase"].values[0]
+def build_figure_sfd(loadcase, force_key):
+
     def find_component(name):
         for c in ds["Component"].values:
             if c.lower() == name.lower():
@@ -409,12 +429,12 @@ def build_figure_sfd():
     open_plot()
 
 
+
 # ============================================================
 #  BMD
 
-def build_figure_bmd():
+def build_figure_bmd(loadcase, force_key):
     # LOAD INTERNAL FORCES (NETCDF)
-    LOADCASE = CURRENT_LOADCASE or ds.coords["Loadcase"].values[0]
     def find_component(name):
         for c in ds["Component"].values:
             if c.lower() == name.lower():
@@ -753,10 +773,10 @@ def build_figure_bmd():
     open_plot()
 
 
+
 # ============================================================
 # BMD CONTOUR
-def build_figure_bmd_contour():
-    LOADCASE = CURRENT_LOADCASE or ds.coords["Loadcase"].values[0]
+def build_figure_bmd_contour(loadcase, force_key):
     def find_component(name):
         for c in ds["Component"].values:
             if c.lower() == name.lower():
@@ -1028,7 +1048,9 @@ def build_figure_bmd_contour():
     fig.write_html(TEMP_HTML, include_plotlyjs=True, full_html=True)
     open_plot()
 
-
+# ============================================================
+# ====================== QT WIDGET
+# ============================================================
 # ============================================================
 # ====================== QT WIDGET
 # ============================================================
@@ -1036,44 +1058,68 @@ class PlotWidget(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Plate Girder Plots")
+        self.setWindowTitle("Plate Girder Results")
 
         layout = QVBoxLayout(self)
 
+        # ---------- TOP CONTROLS ----------
         top = QHBoxLayout()
-        self.sfd = QRadioButton("SFD")
-        self.bmd = QRadioButton("BMD")
-        self.contour = QRadioButton("BMD Contour")
 
-        self.sfd.setChecked(True)
+        # Loadcase
+        top.addWidget(QLabel("Loadcase:"))
+        self.combo = QComboBox()
+        self.combo.addItems(LOADCASES)
+        self.combo.currentTextChanged.connect(self.update_plot)
+        top.addWidget(self.combo)
 
-        group = QButtonGroup(self)
-        group.setExclusive(True)
-        group.addButton(self.sfd)
-        group.addButton(self.bmd)
-        group.addButton(self.contour)
-        self.sfd.clicked.connect(self.update_plot)
-        self.bmd.clicked.connect(self.update_plot)
-        self.contour.clicked.connect(self.update_plot)
+        # Force
+        top.addWidget(QLabel("Force:"))
+        self.force_combo = QComboBox()
+        self.force_combo.addItems(list(FORCE_MAP.keys()))
+        self.force_combo.setCurrentText("Fy")
+        self.force_combo.currentTextChanged.connect(self.update_plot)
+        top.addWidget(self.force_combo)
 
-        top.addWidget(self.sfd)
-        top.addWidget(self.bmd)
+        # Contour
+        self.contour = QCheckBox("Contour (Moments only)")
+        self.contour.stateChanged.connect(self.update_plot)
         top.addWidget(self.contour)
+
+        top.addStretch()
+
+        # ---------- WEB VIEW ----------
+
 
         layout.addLayout(top)
 
+
         self.update_plot()
 
+    # ========================================================
     def update_plot(self):
 
-        if self.sfd.isChecked():
-            build_figure_sfd()
+        loadcase = self.combo.currentText()
+        force_key = self.force_combo.currentText()
 
-        elif self.bmd.isChecked():
-            build_figure_bmd()
+        global CURRENT_LOADCASE
+        CURRENT_LOADCASE = loadcase
+
+        # ----- Force vs Moment logic -----
+        if force_key.startswith("F"):
+
+            self.contour.setChecked(False)
+            self.contour.setEnabled(False)
+
+            build_figure_sfd(loadcase, force_key)
 
         else:
-            build_figure_bmd_contour()
+
+            self.contour.setEnabled(True)
+
+            if self.contour.isChecked():
+                build_figure_bmd_contour(loadcase, force_key)
+            else:
+                build_figure_bmd(loadcase, force_key)
 
 # ============================================================
 # ======================= MAIN
