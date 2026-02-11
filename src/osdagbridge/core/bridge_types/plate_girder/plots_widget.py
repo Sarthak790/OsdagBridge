@@ -1,5 +1,5 @@
+
 import sys
-<<<<<<< HEAD
 import openseespy.opensees as ops
 from pathlib import Path
 from PySide6.QtWidgets import (
@@ -114,126 +114,12 @@ members = {
 # ============================================================
 # SFD (UNCHANGED)
 def build_figure_sfd(ds, force_key):
-=======
-import os
-
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QRadioButton, QButtonGroup
-)
-
-
-import numpy as np
-import plotly.graph_objects as go
-import webbrowser
-
-from analysis_results import PlateGirderAnalysisResults
-from osdagbridge.core.bridge_types.plate_girder.analyser import BridgeGrillageModel
-
-CURRENT_LOADCASE = None
-
-# ============================================================
-# MODEL + ANALYSIS (DATA FROM ANALYSER)
-# ============================================================
-
-model = BridgeGrillageModel()
-model.create_model()
-
-# ---------- ADD LOADS ----------
-model.create_self_weight_load()
-model.create_deck_load()
-model.create_wearing_course_load()
-model.create_footpath_load()
-model.create_crash_barrier_load()
-model.create_railing_load()
-model.create_median_load()
-
-# ---------- RUN ANALYSIS ----------
-model.analyze()
-# ---------- GET DATASET FROM ANALYSER ----------
-ds = model.dataset
-CURRENT_LOADCASE = ds.coords["Loadcase"].values[2]
-if __name__ == "__main__":
-    print(type(ds))
-    print(ds)
-
-# ============================================================
-# RESULT HANDLER + GIRDER BUILD
-# ============================================================
-res = PlateGirderAnalysisResults(
-    dataset=ds,
-    model=model
-)
-
-nodes, elements_all, adj = res.build_grillage_connectivity()
-
-girder_map, elements = res.build_girders(verbose=False)
-
-members = elements_all
-
-# ============================================================
-# EXTRACT FORCE DATA FROM analysis_results
-# ============================================================
-
-girder_force_data = {}
-
-for g, data in girder_map.items():
-
-    elems = data["elements"]
-
-    girder_force_data[g] = {}
-
-    for comp in ds.coords["Component"].values:
-
-        results = res.get_beam_element_results(
-            elems,
-            CURRENT_LOADCASE,
-            comp
-        )
-
-        # Convert array → float
-        girder_force_data[g][comp] = {
-            e: float(v) if v is not None else 0.0
-            for e, v in results.items()
-        }
-
-# ============================================================
-# FILTER GIRDER ELEMENTS (MATCH DATASET)
-# ============================================================
-dataset_elements = set(ds.coords["Element"].values)
-
-for g, data in girder_map.items():
-
-    valid_elems = [
-        e for e in data["elements"]
-        if e in dataset_elements
-    ]
-
-    girder_map[g]["elements"] = valid_elems
-
-
-# print("Girders found →", girder_map.keys())
-
-
-# ============================================================
-# TEMP HTML
-# ============================================================
-TEMP_HTML = os.path.abspath("temp_plot.html")
-
-def open_plot():
-    webbrowser.open("file://" + TEMP_HTML)
-# ============================================================
-# SFD (UNCHANGED)
-def build_figure_sfd():
-    LOADCASE = CURRENT_LOADCASE or ds.coords["Loadcase"].values[0]
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
     def find_component(name):
         for c in ds["Component"].values:
             if c.lower() == name.lower():
                 return c
         return None
 
-<<<<<<< HEAD
     comp_i_name, comp_j_name = FORCE_MAP[force_key]
 
     comp_i = find_component(comp_i_name)
@@ -265,52 +151,6 @@ def build_figure_sfd():
 
     # BUILD GIRDER POLYLINES
     def build_polyline(elem_list, comp_i, comp_j):
-=======
-    Vy_i = find_component("Vy_i")
-    Vy_j = find_component("Vy_j")
-    Mz_i = find_component("Mz_i")
-    Mz_j = find_component("Mz_j")
-    # ----------------------------------------
-    # FETCH FORCES FROM analysis_results CLASS
-    # ----------------------------------------
-    girder_force_data = {}
-
-    for g, data in girder_map.items():
-
-        elems = data["elements"]
-
-        girder_force_data[g] = {}
-
-        # list all components you need
-        components = ["Vy_i", "Vy_j", "Mz_i", "Mz_j"]
-
-        for comp in components:
-            girder_force_data[g][comp] = res.get_beam_element_results(
-                elems,
-                CURRENT_LOADCASE,
-                comp
-            )
-
-
-
-    # GIRDER GROUPING
-    girders = {}
-
-    for i, (key, g) in enumerate(girder_map.items(), start=1):
-        girders[i] = g["elements"]
-    '''
-    colors = {
-        1: "red",
-        2: "orange",
-        3: "green",
-        4: "blue",
-        5: "purple"
-    }
-    '''
-
-    # BUILD GIRDER POLYLINES
-    def build_polyline(elem_list, comp_i, comp_j, current_girder):
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         xs, ys, zs, vals, node_ids = [], [], [], [], []
 
         for e in elem_list:
@@ -320,13 +160,7 @@ def build_figure_sfd():
             xs.append(x1)
             ys.append(y1)
             zs.append(z1)
-<<<<<<< HEAD
             vals.append(round(get_force(e, comp_i), 3))
-=======
-            vals.append(
-                girder_force_data[current_girder]["Vy_i"][e] * 10
-            )
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
             node_ids.append(n1)
 
         # Last end node
@@ -337,13 +171,7 @@ def build_figure_sfd():
         xs.append(x2)
         ys.append(y2)
         zs.append(z2)
-<<<<<<< HEAD
         vals.append(round(get_force(last_e, comp_j), 3))
-=======
-        vals.append(
-            girder_force_data[current_girder]["Vy_j"][last_e] * 10
-        )
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         node_ids.append(n2)
 
         return np.array(xs), np.array(ys), np.array(zs), np.array(vals), node_ids
@@ -356,29 +184,18 @@ def build_figure_sfd():
 
     for i, (gid, elems) in enumerate(girders.items()):
 
-<<<<<<< HEAD
         xs, ys, zs, vy, node_ids = build_polyline(elems, comp_i, comp_j)
-=======
-        xs, ys, zs, vy, node_ids = build_polyline(
-            elems, Vy_i, Vy_j, f"g{gid}"
-        )
-
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 
         Vy = vy.astype(float)
 
         # use real Z from coordinates file
         z_base = np.mean(zs)  # or zs[0]
 
-<<<<<<< HEAD
         if max(Vy) - min(Vy) == 0:
             shear_scale = 0.1 * abs((max(xs) - min(xs)) / (max(Vy) - 0))
 
         else:
             shear_scale = 0.1 * abs((max(xs) - min(xs)) / (max(Vy) - min(Vy)))
-=======
-        shear_scale = 0.1 * abs((max(xs) - min(xs)) / (max(Vy) - min(Vy)))
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 
         # ---------- BASELINE (GROUND) -------------
         fig_sfd.add_trace(go.Scatter3d(
@@ -409,11 +226,7 @@ def build_figure_sfd():
                 # f"Girder {gid}"
                 f"<br>Node {nid}"
                 f"<br>X = {x:.3f}"
-<<<<<<< HEAD
                 f"<br>{force_key} = {v:.3f}"
-=======
-                f"<br>Vy = {v:.3f}"
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
                 for x, v, nid in zip(x_step, Vy_step, np.repeat(node_ids, 2)[1:-1])
             ],
             showlegend=False
@@ -581,31 +394,20 @@ def build_figure_sfd():
         margin=dict(l=0, r=0, t=40, b=0)
     )
     fig_sfd.write_html(TEMP_HTML, include_plotlyjs=True, full_html=True)
-<<<<<<< HEAD
-=======
-    open_plot()
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 
 
 # ============================================================
 #  BMD
 
-<<<<<<< HEAD
 
 def build_figure_bmd(ds, force_key):
     # LOAD INTERNAL FORCES (NETCDF)
-=======
-def build_figure_bmd():
-    # LOAD INTERNAL FORCES (NETCDF)
-    LOADCASE = CURRENT_LOADCASE or ds.coords["Loadcase"].values[0]
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
     def find_component(name):
         for c in ds["Component"].values:
             if c.lower() == name.lower():
                 return c
         return None
 
-<<<<<<< HEAD
     comp_i_name, comp_j_name = FORCE_MAP[force_key]
     comp_i = find_component(comp_i_name)
     comp_j = find_component(comp_j_name)
@@ -635,22 +437,6 @@ def build_figure_bmd():
 
     # BUILD GIRDER POLYLINES
     def build_polyline(elem_list, comp_i, comp_j):
-=======
-    Vy_i = find_component("Vy_i")
-    Vy_j = find_component("Vy_j")
-    Mz_i = find_component("Mz_i")
-    Mz_j = find_component("Mz_j")
-
-
-    # GIRDER GROUPING
-    girders = {
-        i + 1: data["elements"]
-        for i, (g, data) in enumerate(girder_map.items())
-    }
-
-    # BUILD GIRDER POLYLINES
-    def build_polyline(elem_list, comp_i, comp_j, current_girder):
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         xs, ys, zs, vals, node_ids = [], [], [], [], []
 
         for e in elem_list:
@@ -659,17 +445,9 @@ def build_figure_bmd():
             xs.append(x1)
             ys.append(y1)
             zs.append(z1)
-<<<<<<< HEAD
             vals.append(round(get_force(e, comp_i), 3))
             node_ids.append(n1)
         print(f"Element list: {elem_list}")
-=======
-            vals.append(
-                girder_force_data[current_girder][comp_i][e]
-            )
-            node_ids.append(n1)
-
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         # Last end node
         last_e = elem_list[-1]
         n1, n2 = members[last_e]
@@ -678,13 +456,7 @@ def build_figure_bmd():
         xs.append(x2)
         ys.append(y2)
         zs.append(z2)
-<<<<<<< HEAD
         vals.append(round(get_force(last_e, comp_j), 3))
-=======
-        vals.append(
-            girder_force_data[current_girder][comp_j][last_e]
-        )
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         node_ids.append(n2)
 
         return np.array(xs), np.array(ys), np.array(zs), np.array(vals), node_ids
@@ -703,28 +475,16 @@ def build_figure_bmd():
     #factormz= abs(diffmzfull/diffxfull)*0.2
     '''
     for gid, elems in girders.items():
-<<<<<<< HEAD
         xs, ys, zs, mz, node_ids = build_polyline(elems, comp_i, comp_j)
         if max(mz) - min(mz) == 0:
             factormz = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - 0))
 
 
-=======
-        xs, ys, zs, mz, node_ids = build_polyline(
-            elems, Mz_i, Mz_j, f"g{gid}"
-        )
-        if max(mz) - min(mz) == 0:
-            factormz = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - 0))
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         else:
             factormz = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - min(mz)))
         y_plot = mz * factormz  # * 0.05  # moment scale
         hover_text = [
-<<<<<<< HEAD
             f"Node {nid}<br>X = {x:.3f}<br>{force_key} = {v:.3f}<br>Z = {z:.3f}"
-=======
-            f"Node {nid}<br>X = {x:.3f}<br>Mz = {v:.3f}<br>Z = {z:.3f}"
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
             for nid, x, v, z in zip(node_ids, xs, mz, zs)
         ]
 
@@ -988,27 +748,17 @@ def build_figure_bmd():
     )
 
     fig_bmd.write_html(TEMP_HTML, include_plotlyjs=True, full_html=True)
-<<<<<<< HEAD
-=======
-    open_plot()
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 
 
 # ============================================================
 # BMD CONTOUR
-<<<<<<< HEAD
 def build_figure_bmd_contour(ds, force_key):
-=======
-def build_figure_bmd_contour():
-    LOADCASE = CURRENT_LOADCASE or ds.coords["Loadcase"].values[0]
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
     def find_component(name):
         for c in ds["Component"].values:
             if c.lower() == name.lower():
                 return c
         return None
 
-<<<<<<< HEAD
     comp_i_name, comp_j_name = FORCE_MAP[force_key]
     comp_i = find_component(comp_i_name)
     comp_j = find_component(comp_j_name)
@@ -1038,24 +788,11 @@ def build_figure_bmd_contour():
         # only longitudinal members (same Z at both ends)
         if z1 == z2:
             girders[z1].append(int(ele))
-=======
-    Mz_i = find_component("Mz_i")
-    Mz_j = find_component("Mz_j")
-
-    def get_force(girder_key, elem, comp):
-        return girder_force_data[girder_key][comp].get(elem, 0.0)
-
-    girders = girder_map
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 
     # -------------------------------------------------------------
     # BUILD GIRDER POLYLINE
     # -------------------------------------------------------------
-<<<<<<< HEAD
     def build_polyline(elem_list, comp_i, comp_j):
-=======
-    def build_polyline(girder_key, elem_list, comp_i, comp_j):
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         xs, ys, zs, mz, node_ids = [], [], [], [], []
 
         for e in elem_list:
@@ -1065,11 +802,7 @@ def build_figure_bmd_contour():
             xs.append(x1)
             ys.append(y1)
             zs.append(z1)
-<<<<<<< HEAD
             mz.append(round(get_force(e, comp_i), 3))
-=======
-            mz.append(get_force(girder_key, e, comp_i))
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
             node_ids.append(n1)
 
         last_e = elem_list[-1]
@@ -1079,28 +812,14 @@ def build_figure_bmd_contour():
         xs.append(x2)
         ys.append(y2)
         zs.append(z2)
-<<<<<<< HEAD
         mz.append(round(get_force(last_e, comp_j), 3))
-=======
-        mz.append(get_force(girder_key, last_e, comp_j))
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         node_ids.append(n2)
 
         return np.array(xs), np.array(ys), np.array(zs), np.array(mz), node_ids
 
     xfull, mzfull = [], []
-<<<<<<< HEAD
     for elems in girders.values():
         xs, ys, zs, mz, _ = build_polyline(elems, comp_i, comp_j)
-=======
-    for girder_key, data in girders.items():
-        elems = data["elements"]
-
-        xs, ys, zs, mz, _ = build_polyline(
-            girder_key, elems, Mz_i, Mz_j
-        )
-
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         xfull.extend(xs)
         mzfull.extend(mz)
 
@@ -1111,23 +830,11 @@ def build_figure_bmd_contour():
     # -------------------------------------------------------------
     fig = go.Figure()
 
-<<<<<<< HEAD
     for gid, elems in girders.items():
         xs, ys, zs, mz, node_ids = build_polyline(elems, comp_i, comp_j)
         if max(mz) - min(mz) == 0:
             moment_scale = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - 0))
 
-=======
-    for gid, (girder_key, data) in enumerate(girders.items(), start=1):
-
-        elems = data["elements"]
-
-        xs, ys, zs, mz, node_ids = build_polyline(
-            girder_key, elems, Mz_i, Mz_j
-        )
-        if max(mz) - min(mz) == 0:
-            moment_scale = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - 0))
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
         else:
             moment_scale = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - min(mz)))
         y_plot = mz * moment_scale
@@ -1148,11 +855,7 @@ def build_figure_bmd_contour():
             showlegend=False,
             hoverinfo="text",
             text=[
-<<<<<<< HEAD
                 f"Node {nid}<br>X={x:.3f}<br>{force_key}={v:.3f}"
-=======
-                f"Node {nid}<br>X={x:.3f}<br>Mz={v:.3f}"
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
                 for nid, x, v in zip(node_ids, xs, mz)
             ]
         ))
@@ -1332,19 +1035,11 @@ def build_figure_bmd_contour():
     )
 
     fig.write_html(TEMP_HTML, include_plotlyjs=True, full_html=True)
-<<<<<<< HEAD
-=======
-    open_plot()
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 
 
 # ============================================================
 # ====================== QT WIDGET
-<<<<<<< HEAD
 '''
-=======
-# ============================================================
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 class PlotWidget(QWidget):
 
     def __init__(self):
@@ -1365,19 +1060,12 @@ class PlotWidget(QWidget):
         group.addButton(self.sfd)
         group.addButton(self.bmd)
         group.addButton(self.contour)
-<<<<<<< HEAD
         group.buttonClicked.connect(self.update_plot)
-=======
-        self.sfd.clicked.connect(self.update_plot)
-        self.bmd.clicked.connect(self.update_plot)
-        self.contour.clicked.connect(self.update_plot)
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 
         top.addWidget(self.sfd)
         top.addWidget(self.bmd)
         top.addWidget(self.contour)
 
-<<<<<<< HEAD
         self.web = QWebEngineView()
 
         layout.addLayout(top)
@@ -1437,14 +1125,10 @@ class PlotWidget(QWidget):
 
         layout.addLayout(top)
         layout.addWidget(self.web)
-=======
-        layout.addLayout(top)
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 
         self.update_plot()
 
     def update_plot(self):
-<<<<<<< HEAD
         loadcase = self.combo.currentText()
         force_key = self.force_combo.currentText()
 
@@ -1481,31 +1165,9 @@ class PlotWidget(QWidget):
 
 
 # ======================= MAIN
-=======
-
-        if self.sfd.isChecked():
-            build_figure_sfd()
-
-        elif self.bmd.isChecked():
-            build_figure_bmd()
-
-        else:
-            build_figure_bmd_contour()
-
-# ============================================================
-# ======================= MAIN
-# ============================================================
-
-
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = PlotWidget()
     w.resize(1200, 800)
     w.show()
-<<<<<<< HEAD
     sys.exit(app.exec())
-=======
-    sys.exit(app.exec())
-
->>>>>>> cd3bd45 (Add plots widget using analysis_results dataset and integrate girder force extraction)
