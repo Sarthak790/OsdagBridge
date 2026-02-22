@@ -350,10 +350,18 @@ class PlateGirderAnalysisResults:
                     # Extract values and create DataFrame
                     df = pd.DataFrame({
                         "Element": elements,
-                        "Vy_i (kN)": subset.sel(Component="Vy_i")["forces"].values,
-                        "Vy_j (kN)": subset.sel(Component="Vy_j")["forces"].values,
-                        "Mz_i (kNm)": subset.sel(Component="Mz_i")["forces"].values,
-                        "Mz_j (kNm)": subset.sel(Component="Mz_j")["forces"].values
+                        "Vx_i": subset.sel(Component="Vx_i")["forces"].values,
+                        "Vx_j": subset.sel(Component="Vx_j")["forces"].values,
+                        "Vy_i": subset.sel(Component="Vy_i")["forces"].values,
+                        "Vy_j": subset.sel(Component="Vy_j")["forces"].values,
+                        "Vz_i": subset.sel(Component="Vz_i")["forces"].values,
+                        "Vz_j": subset.sel(Component="Vz_j")["forces"].values,
+                        "Mx_i": subset.sel(Component="Mx_i")["forces"].values,
+                        "Mx_j": subset.sel(Component="Mx_j")["forces"].values,
+                        "My_i": subset.sel(Component="My_i")["forces"].values,
+                        "My_j": subset.sel(Component="My_j")["forces"].values,
+                        "Mz_i": subset.sel(Component="Mz_i")["forces"].values,
+                        "Mz_j": subset.sel(Component="Mz_j")["forces"].values,
                     })
                     print(df.to_string(index=False))
 
@@ -413,6 +421,27 @@ class PlateGirderAnalysisResults:
                     vy_i = subset.sel(Component="Vy_i")["forces"]
                     vy_j = subset.sel(Component="Vy_j")["forces"]
 
+                    # --- Vx Envelope ---
+                    vx_i = subset.sel(Component="Vx_i")["forces"]
+                    vx_j = subset.sel(Component="Vx_j")["forces"]
+
+                    # --- Vz Envelope ---
+                    vz_i = subset.sel(Component="Vz_i")["forces"]
+                    vz_j = subset.sel(Component="Vz_j")["forces"]
+
+                    # --- Mx Envelope ---
+                    mx_i = subset.sel(Component="Mx_i")["forces"]
+                    mx_j = subset.sel(Component="Mx_j")["forces"]
+
+                    # --- My Envelope ---
+                    my_i = subset.sel(Component="My_i")["forces"]
+                    my_j = subset.sel(Component="My_j")["forces"]
+
+                    # --- Mz Envelope ---
+                    mz_i = subset.sel(Component="Mz_i")["forces"]
+                    mz_j = subset.sel(Component="Mz_j")["forces"]
+
+                    # Compute max/min for Vy
                     mxi, mxj = float(vy_i.max()), float(vy_j.max())
                     if mxi >= mxj:
                         v_max, v_max_e = mxi, int(vy_i.idxmax())
@@ -425,10 +454,59 @@ class PlateGirderAnalysisResults:
                     else:
                         v_min, v_min_e = mnj, int(vy_j.idxmin())
 
-                    # --- Mz Envelope ---
-                    mz_i = subset.sel(Component="Mz_i")["forces"]
-                    mz_j = subset.sel(Component="Mz_j")["forces"]
+                    # Compute max/min for Vx
+                    mx_i_val, mx_j_val = float(vx_i.max()), float(vx_j.max())
+                    if mx_i_val >= mx_j_val:
+                        vx_max, vx_max_e = mx_i_val, int(vx_i.idxmax())
+                    else:
+                        vx_max, vx_max_e = mx_j_val, int(vx_j.idxmax())
 
+                    mn_i_val, mn_j_val = float(vx_i.min()), float(vx_j.min())
+                    if mn_i_val <= mn_j_val:
+                        vx_min, vx_min_e = mn_i_val, int(vx_i.idxmin())
+                    else:
+                        vx_min, vx_min_e = mn_j_val, int(vx_j.idxmin())
+
+                    # Compute max/min for Vz
+                    mz_i_val, mz_j_val = float(vz_i.max()), float(vz_j.max())
+                    if mz_i_val >= mz_j_val:
+                        vz_max, vz_max_e = mz_i_val, int(vz_i.idxmax())
+                    else:
+                        vz_max, vz_max_e = mz_j_val, int(vz_j.idxmax())
+
+                    mnz_i_val, mnz_j_val = float(vz_i.min()), float(vz_j.min())
+                    if mnz_i_val <= mnz_j_val:
+                        vz_min, vz_min_e = mnz_i_val, int(vz_i.idxmin())
+                    else:
+                        vz_min, vz_min_e = mnz_j_val, int(vz_j.idxmin())
+
+                    # Compute max/min for Mx
+                    mx_i_val, mx_j_val = float(mx_i.max()), float(mx_j.max())
+                    if mx_i_val >= mx_j_val:
+                        mx_max, mx_max_e = mx_i_val, int(mx_i.idxmax())
+                    else:
+                        mx_max, mx_max_e = mx_j_val, int(mx_j.idxmax())
+
+                    mnx_i_val, mnx_j_val = float(mx_i.min()), float(mx_j.min())
+                    if mnx_i_val <= mnx_j_val:
+                        mx_min, mx_min_e = mnx_i_val, int(mx_i.idxmin())
+                    else:
+                        mx_min, mx_min_e = mnx_j_val, int(mx_j.idxmin())
+
+                    # Compute max/min for My
+                    my_i_val, my_j_val = float(my_i.max()), float(my_j.max())
+                    if my_i_val >= my_j_val:
+                        my_max, my_max_e = my_i_val, int(my_i.idxmax())
+                    else:
+                        my_max, my_max_e = my_j_val, int(my_j.idxmax())
+
+                    mny_i_val, mny_j_val = float(my_i.min()), float(my_j.min())
+                    if mny_i_val <= mny_j_val:
+                        my_min, my_min_e = mny_i_val, int(my_i.idxmin())
+                    else:
+                        my_min, my_min_e = mny_j_val, int(my_j.idxmin())
+
+                    # Compute max/min for Mz
                     mmxi, mmxj = float(mz_i.max()), float(mz_j.max())
                     if mmxi >= mmxj:
                         m_max, m_max_e = mmxi, int(mz_i.idxmax())
@@ -443,9 +521,30 @@ class PlateGirderAnalysisResults:
 
                     # Group results by element to avoid redundant rows
                     crit_eles = defaultdict(
-                        lambda: {"Max Vy (kN)": "-", "Min Vy (kN)": "-", "Max Mz (kNm)": "-", "Min Mz (kNm)": "-"})
+                        lambda: {
+                            "Max Vy (kN)": "-",
+                            "Min Vy (kN)": "-",
+                            "Max Vx (kN)": "-",
+                            "Min Vx (kN)": "-",
+                            "Max Vz (kN)": "-",
+                            "Min Vz (kN)": "-",
+                            "Max Mx (kNm)": "-",
+                            "Min Mx (kNm)": "-",
+                            "Max My (kNm)": "-",
+                            "Min My (kNm)": "-",
+                            "Max Mz (kNm)": "-",
+                            "Min Mz (kNm)": "-",
+                        })
                     crit_eles[v_max_e]["Max Vy (kN)"] = f"{v_max:.3f}"
                     crit_eles[v_min_e]["Min Vy (kN)"] = f"{v_min:.3f}"
+                    crit_eles[vx_max_e]["Max Vx (kN)"] = f"{vx_max:.3f}"
+                    crit_eles[vx_min_e]["Min Vx (kN)"] = f"{vx_min:.3f}"
+                    crit_eles[vz_max_e]["Max Vz (kN)"] = f"{vz_max:.3f}"
+                    crit_eles[vz_min_e]["Min Vz (kN)"] = f"{vz_min:.3f}"
+                    crit_eles[mx_max_e]["Max Mx (kNm)"] = f"{mx_max:.3f}"
+                    crit_eles[mx_min_e]["Min Mx (kNm)"] = f"{mx_min:.3f}"
+                    crit_eles[my_max_e]["Max My (kNm)"] = f"{my_max:.3f}"
+                    crit_eles[my_min_e]["Min My (kNm)"] = f"{my_min:.3f}"
                     crit_eles[m_max_e]["Max Mz (kNm)"] = f"{m_max:.3f}"
                     crit_eles[m_min_e]["Min Mz (kNm)"] = f"{m_min:.3f}"
 
@@ -483,7 +582,12 @@ class PlateGirderAnalysisResults:
         if choice == "0":
             return
 
-        comp_map = {"1": "Vy_i", "2": "Vy_j", "3": "Mz_i", "4": "Mz_j"}
+        comp_map = {
+            "1": "Vy_i",
+            "2": "Vy_j",
+            "3": "Mz_i",
+            "4": "Mz_j",
+        }
         if choice not in comp_map:
             print("❌ Invalid selection")
             return
@@ -527,25 +631,41 @@ class PlateGirderAnalysisResults:
 
         girder_map, _ = self.build_girders(verbose=False)
 
-        global_max = -float('inf')
+        global_abs_max = -1.0
+        crit_val = 0.0
         crit_lc = None
         crit_girder = None
         crit_ele = None
 
-        print(f"\nSearching for maximum {comp} in {selected_category} ({len(relevant_lcs)} positions)...")
+        print(f"\nSearching for absolute maximum {comp} in {selected_category} ({len(relevant_lcs)} positions)...")
 
-        # 3. Search for global maximum within selected category
+        # 3. Search for absolute maximum within selected category
         for lc in relevant_lcs:
             for g_name, g_data in girder_map.items():
                 elements = g_data["elements"]
                 try:
                     subset = self.ds.sel(Loadcase=lc, Element=elements, Component=comp)["forces"]
-                    current_max = float(subset.max())
-                    if current_max > global_max:
-                        global_max = current_max
+
+                    # Find both max and min in this subset
+                    s_max = float(subset.max())
+                    s_min = float(subset.min())
+
+                    # Determine which has larger magnitude
+                    if abs(s_max) >= abs(s_min):
+                        local_abs_max = abs(s_max)
+                        local_val = s_max
+                        local_ele = int(subset.idxmax())
+                    else:
+                        local_abs_max = abs(s_min)
+                        local_val = s_min
+                        local_ele = int(subset.idxmin())
+
+                    if local_abs_max > global_abs_max:
+                        global_abs_max = local_abs_max
+                        crit_val = local_val
                         crit_lc = lc
                         crit_girder = g_name
-                        crit_ele = int(subset.idxmax())
+                        crit_ele = local_ele
                 except Exception:
                     continue
 
@@ -570,7 +690,7 @@ class PlateGirderAnalysisResults:
             "Component": comp,
             "Girder": crit_girder,
             "Element": crit_ele,
-            "Value": f"{global_max:.3f}",
+            "Value": f"{crit_val:.3f}",
             "Loadcase (Short)": short_lc,
             "Position": position_str
         }]
@@ -587,8 +707,16 @@ class PlateGirderAnalysisResults:
             try:
                 subset = self.ds.sel(Loadcase=crit_lc, Element=elements)
 
+                vx_i = subset.sel(Component="Vx_i")["forces"].values
+                vx_j = subset.sel(Component="Vx_j")["forces"].values
                 vy_i = subset.sel(Component="Vy_i")["forces"].values
                 vy_j = subset.sel(Component="Vy_j")["forces"].values
+                vz_i = subset.sel(Component="Vz_i")["forces"].values
+                vz_j = subset.sel(Component="Vz_j")["forces"].values
+                mx_i = subset.sel(Component="Mx_i")["forces"].values
+                mx_j = subset.sel(Component="Mx_j")["forces"].values
+                my_i = subset.sel(Component="My_i")["forces"].values
+                my_j = subset.sel(Component="My_j")["forces"].values
                 mz_i = subset.sel(Component="Mz_i")["forces"].values
                 mz_j = subset.sel(Component="Mz_j")["forces"].values
 
@@ -597,8 +725,16 @@ class PlateGirderAnalysisResults:
                 for i, eid in enumerate(elements):
                     row = {
                         "Element": eid,
+                        "Vx_i": f"{vx_i[i]:.3f}",
+                        "Vx_j": f"{vx_j[i]:.3f}",
                         "Vy_i": f"{vy_i[i]:.3f}",
                         "Vy_j": f"{vy_j[i]:.3f}",
+                        "Vz_i": f"{vz_i[i]:.3f}",
+                        "Vz_j": f"{vz_j[i]:.3f}",
+                        "Mx_i": f"{mx_i[i]:.3f}",
+                        "Mx_j": f"{mx_j[i]:.3f}",
+                        "My_i": f"{my_i[i]:.3f}",
+                        "My_j": f"{my_j[i]:.3f}",
                         "Mz_i": f"{mz_i[i]:.3f}",
                         "Mz_j": f"{mz_j[i]:.3f}"
                     }
@@ -740,8 +876,7 @@ class PlateGirderAnalysisResults:
                             continue
 
                         lc = loadcases[lc_in - 1]
-                        import plots_widget
-                        plots_widget.CURRENT_LOADCASE = lc
+                        # Plotting disabled as per user request.
                         # ================= RESULT TYPE LOOP =================
                         while True:
 
