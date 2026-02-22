@@ -992,3 +992,4 @@ class PlateGirderAnalysisResults:
 
             else:
                 print("❌ Invalid option")
+
