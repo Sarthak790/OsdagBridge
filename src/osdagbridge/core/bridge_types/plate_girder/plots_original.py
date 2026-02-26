@@ -1,7 +1,5 @@
 
 import sys
-import os
-import webbrowser
 import openseespy.opensees as ops
 from pathlib import Path
 from PySide6.QtWidgets import (
@@ -16,7 +14,6 @@ import numpy as np
 import plotly.graph_objects as go
 
 from osdagbridge.core.bridge_types.plate_girder.analyser import BridgeGrillageModel
-from osdagbridge.core.bridge_types.plate_girder.analysis_results import PlateGirderAnalysisResults
 
 FORCE_MAP = {
     "Fx": ("Vx_i", "Vx_j"),
@@ -36,12 +33,6 @@ bridge.create_footpath_load()
 bridge.create_crash_barrier_load()
 bridge.create_railing_load()
 bridge.create_median_load()
-
-bridge.vehicle_lane_coordinates()
-bridge.create_vehicle_load_cases()
-bridge.add_vehicle_load_cases_from_combinations()
-bridge.create_moving_vehicle_load_cases()
-
 bridge.analyze()
 
 results = bridge.model.get_results()
@@ -49,24 +40,17 @@ results = bridge.model.get_results()
 # results = convert_object_to_float(girder_results)
 
 
-# LOADCASES = [
-#     "girder self weight",
-#     "Deck slab load",
-#     "Wearing course self weight",
-#     "Footpath load",
-#     "Crash barrier load",
-#     "Railing load",
-#     "Median load",
-# ]
-result_handler = PlateGirderAnalysisResults(dataset=results, model=bridge.model)
-LOADCASES = [str(lc) for lc in result_handler.get_available_loadcases()]
+LOADCASES = [
+    "girder self weight",
+    "Deck slab load",
+    "Wearing course self weight",
+    "Footpath load",
+    "Crash barrier load",
+    "Railing load",
+    "Median load",
+]
 
 ds_all = results
-
-try:
-    EDGE_BEAMS = [int(e) for e in bridge.model.get_element(member="edge_beam", options="elements")]
-except Exception:
-    EDGE_BEAMS = []
 
 
 def get_ds(loadcase):
@@ -126,35 +110,6 @@ members = {
     for e in ops.getEleTags()
 }
 
-def add_grillage_background(fig, nodes_dict, members_dict):
-    """
-    Adds a distinct grey background mesh showing all longitudinal 
-    and transverse elements in the grillage at the y=0 baseline.
-    """
-    x_grill, y_grill, z_grill = [], [], []
-    
-    for ele_tag, (n1, n2) in members_dict.items():
-        x1, _, z1 = nodes_dict[n1]
-        x2, _, z2 = nodes_dict[n2]
-        
-        # Add the line segment, then a None to break the line
-        x_grill.extend([x1, x2, None])
-        y_grill.extend([0, 0, None])  # Draw it flat at the baseline
-        z_grill.extend([z1, z2, None])
-        
-    fig.add_trace(go.Scatter3d(
-        x=x_grill, 
-        y=y_grill, 
-        z=z_grill,
-        mode='lines',
-        # --- INCREASED INTENSITY HERE ---
-        line=dict(color='darkgrey', width=2), 
-        opacity=0.9, 
-        # --------------------------------
-        hoverinfo='skip',
-        showlegend=False
-    ))
-
 
 # ============================================================
 # SFD (UNCHANGED)
@@ -185,10 +140,6 @@ def build_figure_sfd(ds, force_key):
     girders = defaultdict(list)
 
     for ele in ops.getEleTags():
-        ele_id = int(ele)
-        # Skip the edge beams (overhangs)
-        if ele_id in EDGE_BEAMS:
-            continue
         n1, n2 = map(int, ops.eleNodes(ele))
 
         z1 = node_z[n1]
@@ -228,7 +179,6 @@ def build_figure_sfd(ds, force_key):
     # ===================== 3D STEPPED SFD =====================
 
     fig_sfd = go.Figure()
-    add_grillage_background(fig_sfd, nodes, members)
 
     # girder_spacing = 3.0
 
@@ -264,19 +214,6 @@ def build_figure_sfd(ds, force_key):
 
         y_step = Vy_step * shear_scale
         z_step = [z_base] * len(y_step)
-
-        # --- TRANSPARENT FILL FOR SFD ---
-        fig_sfd.add_trace(go.Surface(
-            x=[x_step, x_step],
-            y=[np.zeros(len(y_step)), y_step],
-            z=[z_step, z_step],
-            surfacecolor=[[1]*len(y_step), [1]*len(y_step)], # Dummy values for solid color
-            colorscale=[[0, 'blue'], [1, 'blue']],           # Solid blue
-            opacity=0.2,                                     # Semi-transparent
-            showscale=False,
-            hoverinfo="skip"
-        ))
-        # --------------------------------
 
         fig_sfd.add_trace(go.Scatter3d(
             x=x_step,
@@ -323,110 +260,110 @@ def build_figure_sfd(ds, force_key):
                 ))
         # fig_bmd = go.Figure()
         # ------------ SUPPORT GEOMETRY -----------
-        # L = max(xs) - min(xs)
-        # h = 0.0199 * L  # support height
-        # w = 0.006 * L  # support half-width
-        # r = 0.0025 * L  # roller radius
-        # # ---------- PIN SUPPORT (START NODE) ----------
-        # x0, z0 = xs[0], zs[0]
+        L = max(xs) - min(xs)
+        h = 0.0199 * L  # support height
+        w = 0.006 * L  # support half-width
+        r = 0.0025 * L  # roller radius
+        # ---------- PIN SUPPORT (START NODE) ----------
+        x0, z0 = xs[0], zs[0]
 
-        # fig_sfd.add_trace(go.Scatter3d(
-        #     x=[x0 - w, x0, x0 + w, x0 - w],
-        #     y=[-h, 0, -h, -h],
-        #     z=[z0, z0, z0, z0],
-        #     mode="lines",
-        #     line=dict(color="green", width=5),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
-        # # ===== PIN SUPPORT BASE (GROUND + HATCH) =====
-        # n_hatch = 6
-        # hatch_len = 0.15 * h
+        fig_sfd.add_trace(go.Scatter3d(
+            x=[x0 - w, x0, x0 + w, x0 - w],
+            y=[-h, 0, -h, -h],
+            z=[z0, z0, z0, z0],
+            mode="lines",
+            line=dict(color="green", width=5),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+        # ===== PIN SUPPORT BASE (GROUND + HATCH) =====
+        n_hatch = 6
+        hatch_len = 0.15 * h
 
-        # # ground line
-        # fig_sfd.add_trace(go.Scatter3d(
-        #     x=[x0 - 1.3 * w, x0 + 1.3 * w],
-        #     y=[-h, -h],
-        #     z=[z_base, z_base],
-        #     mode="lines",
-        #     line=dict(color="green", width=4),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
+        # ground line
+        fig_sfd.add_trace(go.Scatter3d(
+            x=[x0 - 1.3 * w, x0 + 1.3 * w],
+            y=[-h, -h],
+            z=[z_base, z_base],
+            mode="lines",
+            line=dict(color="green", width=4),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
 
-        # # hatch lines
-        # xs_hatch = np.linspace(x0 - 1.2 * w, x0 + 1.2 * w, n_hatch)
+        # hatch lines
+        xs_hatch = np.linspace(x0 - 1.2 * w, x0 + 1.2 * w, n_hatch)
 
-        # for xh in xs_hatch:
-        #     fig_sfd.add_trace(go.Scatter3d(
-        #         x=[xh - 0.04 * w, xh + 0.04 * w],
-        #         y=[-h, -h - hatch_len],
-        #         z=[z_base, z_base],
-        #         mode="lines",
-        #         line=dict(color="green", width=2),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
+        for xh in xs_hatch:
+            fig_sfd.add_trace(go.Scatter3d(
+                x=[xh - 0.04 * w, xh + 0.04 * w],
+                y=[-h, -h - hatch_len],
+                z=[z_base, z_base],
+                mode="lines",
+                line=dict(color="green", width=2),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
 
-        # # --------ROLLER SUPPORT(END NODE)--------------
-        # x1, z1 = xs[-1], zs[-1]
+        # --------ROLLER SUPPORT(END NODE)--------------
+        x1, z1 = xs[-1], zs[-1]
 
-        # # Triangle
-        # fig_sfd.add_trace(go.Scatter3d(
-        #     x=[x1 - w, x1, x1 + w, x1 - w],
-        #     y=[-h, 0, -h, -h],
-        #     z=[z1, z1, z1, z1],
-        #     mode="lines",
-        #     line=dict(color="green", width=5),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
-        # Yb = -h  # base of triangle
+        # Triangle
+        fig_sfd.add_trace(go.Scatter3d(
+            x=[x1 - w, x1, x1 + w, x1 - w],
+            y=[-h, 0, -h, -h],
+            z=[z1, z1, z1, z1],
+            mode="lines",
+            line=dict(color="green", width=5),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+        Yb = -h  # base of triangle
 
-        # # Rollers (two wheels)
-        # theta = np.linspace(0, 2 * np.pi, 60)
+        # Rollers (two wheels)
+        theta = np.linspace(0, 2 * np.pi, 60)
 
-        # for dx in [-w / 2, w / 2]:
-        #     fig_sfd.add_trace(go.Scatter3d(
-        #         x=x1 + dx + r * np.cos(theta),
-        #         y=(Yb - r) + r * np.sin(theta),  # tangent to triangle base
-        #         z=[z1] * len(theta),
-        #         mode="lines",
-        #         line=dict(color="green", width=5),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
-        #     # ===== ROLLER SUPPORT BASE (GROUND + HATCH) =====
-        # # ===== ROLLER SUPPORT BASE (TANGENT TO ROLLERS) =====
-        # n_hatch = 6
-        # hatch_len = 0.15 * h
+        for dx in [-w / 2, w / 2]:
+            fig_sfd.add_trace(go.Scatter3d(
+                x=x1 + dx + r * np.cos(theta),
+                y=(Yb - r) + r * np.sin(theta),  # tangent to triangle base
+                z=[z1] * len(theta),
+                mode="lines",
+                line=dict(color="green", width=5),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
+            # ===== ROLLER SUPPORT BASE (GROUND + HATCH) =====
+        # ===== ROLLER SUPPORT BASE (TANGENT TO ROLLERS) =====
+        n_hatch = 6
+        hatch_len = 0.15 * h
 
-        # y_ground = Yb - 2 * r  # tangent to roller bottom
+        y_ground = Yb - 2 * r  # tangent to roller bottom
 
-        # # ground line
-        # fig_sfd.add_trace(go.Scatter3d(
-        #     x=[x1 - 1.3 * w, x1 + 1.3 * w],
-        #     y=[y_ground, y_ground],
-        #     z=[z_base, z_base],
-        #     mode="lines",
-        #     line=dict(color="green", width=4),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
+        # ground line
+        fig_sfd.add_trace(go.Scatter3d(
+            x=[x1 - 1.3 * w, x1 + 1.3 * w],
+            y=[y_ground, y_ground],
+            z=[z_base, z_base],
+            mode="lines",
+            line=dict(color="green", width=4),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
 
-        # # hatch lines
-        # xs_hatch = np.linspace(x1 - 1.2 * w, x1 + 1.2 * w, n_hatch)
+        # hatch lines
+        xs_hatch = np.linspace(x1 - 1.2 * w, x1 + 1.2 * w, n_hatch)
 
-        # for xh in xs_hatch:
-        #     fig_sfd.add_trace(go.Scatter3d(
-        #         x=[xh - 0.04 * w, xh + 0.04 * w],
-        #         y=[y_ground, y_ground - hatch_len],
-        #         z=[z_base, z_base],
-        #         mode="lines",
-        #         line=dict(color="green", width=2),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
+        for xh in xs_hatch:
+            fig_sfd.add_trace(go.Scatter3d(
+                x=[xh - 0.04 * w, xh + 0.04 * w],
+                y=[y_ground, y_ground - hatch_len],
+                z=[z_base, z_base],
+                mode="lines",
+                line=dict(color="green", width=2),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
 
     fig_sfd.update_layout(
         title="3D Shear Force Diagram",
@@ -447,8 +384,7 @@ def build_figure_sfd(ds, force_key):
 
             ),
 
-            # aspectmode="data",
-            aspectmode="auto",
+            aspectmode="data",
             camera=dict(
                 eye=dict(x=1.6, y=1.2, z=1.6),
                 up=dict(x=0, y=1, z=0)
@@ -490,11 +426,6 @@ def build_figure_bmd(ds, force_key):
     girders = defaultdict(list)
 
     for ele in ops.getEleTags():
-        ele_id = int(ele)
-        
-        # Skip the edge beams (overhangs)
-        if ele_id in EDGE_BEAMS:
-            continue
         n1, n2 = map(int, ops.eleNodes(ele))
 
         z1 = node_z[n1]
@@ -532,7 +463,6 @@ def build_figure_bmd(ds, force_key):
 
     # PLOTLY 3D BMD INTERACTIVE
     fig_bmd = go.Figure()
-    add_grillage_background(fig_bmd, nodes, members)
     '''
     xfull=[]
     mzfull =[]
@@ -553,18 +483,6 @@ def build_figure_bmd(ds, force_key):
         else:
             factormz = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - min(mz)))
         y_plot = mz * factormz  # * 0.05  # moment scale
-        # --- TRANSPARENT FILL FOR BMD ---
-        fig_bmd.add_trace(go.Surface(
-            x=[xs, xs],
-            y=[np.zeros(len(xs)), y_plot],
-            z=[zs, zs],
-            surfacecolor=[[1]*len(xs), [1]*len(xs)], # Dummy values for solid color
-            colorscale=[[0, 'red'], [1, 'red']],     # Solid red
-            opacity=0.2,                             # Semi-transparent
-            showscale=False,
-            hoverinfo="skip"
-        ))
-        # --------------------------------
         hover_text = [
             f"Node {nid}<br>X = {x:.3f}<br>{force_key} = {v:.3f}<br>Z = {z:.3f}"
             for nid, x, v, z in zip(node_ids, xs, mz, zs)
@@ -623,107 +541,107 @@ def build_figure_bmd(ds, force_key):
         ))
 
         # ------------ SUPPORT GEOMETRY -----------
-        # L = max(xs) - min(xs)
-        # h = 0.0399 * L  # support height
-        # w = 0.015 * L  # support half-width
-        # r = 0.005 * L  # roller radius
+        L = max(xs) - min(xs)
+        h = 0.0399 * L  # support height
+        w = 0.015 * L  # support half-width
+        r = 0.005 * L  # roller radius
 
-        # # ---------- PIN SUPPORT (START NODE) ----------
-        # x0, z0 = xs[0], zs[0]
+        # ---------- PIN SUPPORT (START NODE) ----------
+        x0, z0 = xs[0], zs[0]
 
-        # fig_bmd.add_trace(go.Scatter3d(
-        #     x=[x0 - w, x0, x0 + w, x0 - w],
-        #     y=[-h, 0, -h, -h],
-        #     z=[z0, z0, z0, z0],
-        #     mode="lines",
-        #     line=dict(color="green", width=5),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
-        # n_hatch = 6
-        # hatch_len = 0.15 * h
+        fig_bmd.add_trace(go.Scatter3d(
+            x=[x0 - w, x0, x0 + w, x0 - w],
+            y=[-h, 0, -h, -h],
+            z=[z0, z0, z0, z0],
+            mode="lines",
+            line=dict(color="green", width=5),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+        n_hatch = 6
+        hatch_len = 0.15 * h
 
-        # # ground line
-        # fig_bmd.add_trace(go.Scatter3d(
-        #     x=[x0 - 1.3 * w, x0 + 1.3 * w],
-        #     y=[-h, -h],
-        #     z=[z0, z0],
-        #     mode="lines",
-        #     line=dict(color="green", width=4),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
+        # ground line
+        fig_bmd.add_trace(go.Scatter3d(
+            x=[x0 - 1.3 * w, x0 + 1.3 * w],
+            y=[-h, -h],
+            z=[z0, z0],
+            mode="lines",
+            line=dict(color="green", width=4),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
 
-        # # hatch lines
-        # xs_hatch = np.linspace(x0 - 1.2 * w, x0 + 1.2 * w, n_hatch)
+        # hatch lines
+        xs_hatch = np.linspace(x0 - 1.2 * w, x0 + 1.2 * w, n_hatch)
 
-        # for xh in xs_hatch:
-        #     fig_bmd.add_trace(go.Scatter3d(
-        #         x=[xh - 0.04 * w, xh + 0.04 * w],
-        #         y=[-h, -h - hatch_len],
-        #         z=[z0, z0],
-        #         mode="lines",
-        #         line=dict(color="green", width=2),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
-        # # --------ROLLER SUPPORT(END NODE)--------------
-        # x1, z1 = xs[-1], zs[-1]
+        for xh in xs_hatch:
+            fig_bmd.add_trace(go.Scatter3d(
+                x=[xh - 0.04 * w, xh + 0.04 * w],
+                y=[-h, -h - hatch_len],
+                z=[z0, z0],
+                mode="lines",
+                line=dict(color="green", width=2),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
+        # --------ROLLER SUPPORT(END NODE)--------------
+        x1, z1 = xs[-1], zs[-1]
 
-        # # Triangle
-        # fig_bmd.add_trace(go.Scatter3d(
-        #     x=[x1 - w, x1, x1 + w, x1 - w],
-        #     y=[-h, 0, -h, -h],
-        #     z=[z1, z1, z1, z1],
-        #     mode="lines",
-        #     line=dict(color="green", width=5),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
-        # Yb = -h  # base of triangle
+        # Triangle
+        fig_bmd.add_trace(go.Scatter3d(
+            x=[x1 - w, x1, x1 + w, x1 - w],
+            y=[-h, 0, -h, -h],
+            z=[z1, z1, z1, z1],
+            mode="lines",
+            line=dict(color="green", width=5),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
+        Yb = -h  # base of triangle
 
-        # # Rollers (two wheels)
-        # theta = np.linspace(0, 2 * np.pi, 60)
+        # Rollers (two wheels)
+        theta = np.linspace(0, 2 * np.pi, 60)
 
-        # for dx in [-w / 2, w / 2]:
-        #     fig_bmd.add_trace(go.Scatter3d(
-        #         x=x1 + dx + r * np.cos(theta),
-        #         y=(Yb - r) + r * np.sin(theta),  # tangent to triangle base
-        #         z=[z1] * len(theta),
-        #         mode="lines",
-        #         line=dict(color="green", width=5),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
-        # n_hatch = 6
-        # hatch_len = 0.15 * h
+        for dx in [-w / 2, w / 2]:
+            fig_bmd.add_trace(go.Scatter3d(
+                x=x1 + dx + r * np.cos(theta),
+                y=(Yb - r) + r * np.sin(theta),  # tangent to triangle base
+                z=[z1] * len(theta),
+                mode="lines",
+                line=dict(color="green", width=5),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
+        n_hatch = 6
+        hatch_len = 0.15 * h
 
-        # y_ground = Yb - 2 * r  # tangent to roller bottom
+        y_ground = Yb - 2 * r  # tangent to roller bottom
 
-        # # ground line
-        # fig_bmd.add_trace(go.Scatter3d(
-        #     x=[x1 - 1.3 * w, x1 + 1.3 * w],
-        #     y=[y_ground, y_ground],
-        #     z=[z1, z1],
-        #     mode="lines",
-        #     line=dict(color="green", width=4),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
+        # ground line
+        fig_bmd.add_trace(go.Scatter3d(
+            x=[x1 - 1.3 * w, x1 + 1.3 * w],
+            y=[y_ground, y_ground],
+            z=[z1, z1],
+            mode="lines",
+            line=dict(color="green", width=4),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
 
-        # # hatch lines
-        # xs_hatch = np.linspace(x1 - 1.2 * w, x1 + 1.2 * w, n_hatch)
+        # hatch lines
+        xs_hatch = np.linspace(x1 - 1.2 * w, x1 + 1.2 * w, n_hatch)
 
-        # for xh in xs_hatch:
-        #     fig_bmd.add_trace(go.Scatter3d(
-        #         x=[xh - 0.04 * w, xh + 0.04 * w],
-        #         y=[y_ground, y_ground - hatch_len],
-        #         z=[z1, z1],
-        #         mode="lines",
-        #         line=dict(color="green", width=2),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
+        for xh in xs_hatch:
+            fig_bmd.add_trace(go.Scatter3d(
+                x=[xh - 0.04 * w, xh + 0.04 * w],
+                y=[y_ground, y_ground - hatch_len],
+                z=[z1, z1],
+                mode="lines",
+                line=dict(color="green", width=2),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
 
     # pad = 0.01*(max(xfull) - min(xfull))
     # pad2 = 0.01*(max(mzfull) - min(mzfull))
@@ -862,11 +780,6 @@ def build_figure_bmd_contour(ds, force_key):
     girders = defaultdict(list)
 
     for ele in ops.getEleTags():
-        ele_id = int(ele)
-        
-        # Skip the edge beams (overhangs)
-        if ele_id in EDGE_BEAMS:
-            continue
         n1, n2 = map(int, ops.eleNodes(ele))
 
         z1 = node_z[n1]
@@ -916,7 +829,6 @@ def build_figure_bmd_contour(ds, force_key):
     # FIGURE
     # -------------------------------------------------------------
     fig = go.Figure()
-    add_grillage_background(fig, nodes, members)
 
     for gid, elems in girders.items():
         xs, ys, zs, mz, node_ids = build_polyline(elems, comp_i, comp_j)
@@ -926,21 +838,6 @@ def build_figure_bmd_contour(ds, force_key):
         else:
             moment_scale = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - min(mz)))
         y_plot = mz * moment_scale
-
-        # --- TRANSPARENT FILL FOR CONTOUR BMD ---
-        fig.add_trace(go.Surface(
-            x=[xs, xs],
-            y=[np.zeros(len(xs)), y_plot],
-            z=[zs, zs],
-            surfacecolor=[mz, mz],       # Map the fill color to the moment values!
-            colorscale="Jet",            # Match the line's gradient
-            cmin=min(mzfull),
-            cmax=max(mzfull),
-            opacity=0.4,                 # Slightly less transparent to show the gradient
-            showscale=False,
-            hoverinfo="skip"
-        ))
-        # ----------------------------------------
 
         # -------- CONTOUR-STYLE BMD LINE --------
         fig.add_trace(go.Scatter3d(
@@ -993,106 +890,106 @@ def build_figure_bmd_contour(ds, force_key):
             ))
 
         # ------------ SUPPORT GEOMETRY -----------
-        # L = max(xs) - min(xs)
-        # h = 0.0399 * L  # support height
-        # w = 0.015 * L  # support half-width
-        # r = 0.005 * L  # roller radius
+        L = max(xs) - min(xs)
+        h = 0.0399 * L  # support height
+        w = 0.015 * L  # support half-width
+        r = 0.005 * L  # roller radius
 
-        # # ---------- PIN SUPPORT (FIRST NODE) ----------
-        # x0, z0 = xs[0], zs[0]
+        # ---------- PIN SUPPORT (FIRST NODE) ----------
+        x0, z0 = xs[0], zs[0]
 
-        # fig.add_trace(go.Scatter3d(
-        #     x=[x0 - w, x0, x0 + w, x0 - w],
-        #     y=[-h, 0, -h, -h],
-        #     z=[z0, z0, z0, z0],
-        #     mode="lines",
-        #     line=dict(color="green", width=5),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
+        fig.add_trace(go.Scatter3d(
+            x=[x0 - w, x0, x0 + w, x0 - w],
+            y=[-h, 0, -h, -h],
+            z=[z0, z0, z0, z0],
+            mode="lines",
+            line=dict(color="green", width=5),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
 
-        # # ---------- ROLLER SUPPORT (LAST NODE) ----------
-        # x1, z1 = xs[-1], zs[-1]
+        # ---------- ROLLER SUPPORT (LAST NODE) ----------
+        x1, z1 = xs[-1], zs[-1]
 
-        # # Triangle
-        # fig.add_trace(go.Scatter3d(
-        #     x=[x1 - w, x1, x1 + w, x1 - w],
-        #     y=[-h, 0, -h, -h],
-        #     z=[z1, z1, z1, z1],
-        #     mode="lines",
-        #     line=dict(color="green", width=5),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
+        # Triangle
+        fig.add_trace(go.Scatter3d(
+            x=[x1 - w, x1, x1 + w, x1 - w],
+            y=[-h, 0, -h, -h],
+            z=[z1, z1, z1, z1],
+            mode="lines",
+            line=dict(color="green", width=5),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
 
-        # Yb = -h  # base of triangle
-        # theta = np.linspace(0, 2 * np.pi, 60)
+        Yb = -h  # base of triangle
+        theta = np.linspace(0, 2 * np.pi, 60)
 
-        # # Two rollers
-        # for dxr in [-w / 2, w / 2]:
-        #     fig.add_trace(go.Scatter3d(
-        #         x=x1 + dxr + r * np.cos(theta),
-        #         y=(Yb - r) + r * np.sin(theta),
-        #         z=[z1] * len(theta),
-        #         mode="lines",
-        #         line=dict(color="green", width=5),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
-        # n_hatch = 6
-        # hatch_len = 0.15 * h
+        # Two rollers
+        for dxr in [-w / 2, w / 2]:
+            fig.add_trace(go.Scatter3d(
+                x=x1 + dxr + r * np.cos(theta),
+                y=(Yb - r) + r * np.sin(theta),
+                z=[z1] * len(theta),
+                mode="lines",
+                line=dict(color="green", width=5),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
+        n_hatch = 6
+        hatch_len = 0.15 * h
 
-        # # ground line
-        # fig.add_trace(go.Scatter3d(
-        #     x=[x0 - 1.3 * w, x0 + 1.3 * w],
-        #     y=[-h, -h],
-        #     z=[z0, z0],
-        #     mode="lines",
-        #     line=dict(color="green", width=4),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
+        # ground line
+        fig.add_trace(go.Scatter3d(
+            x=[x0 - 1.3 * w, x0 + 1.3 * w],
+            y=[-h, -h],
+            z=[z0, z0],
+            mode="lines",
+            line=dict(color="green", width=4),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
 
-        # # hatch lines
-        # xs_hatch = np.linspace(x0 - 1.2 * w, x0 + 1.2 * w, n_hatch)
+        # hatch lines
+        xs_hatch = np.linspace(x0 - 1.2 * w, x0 + 1.2 * w, n_hatch)
 
-        # for xh in xs_hatch:
-        #     fig.add_trace(go.Scatter3d(
-        #         x=[xh - 0.04 * w, xh + 0.04 * w],
-        #         y=[-h, -h - hatch_len],
-        #         z=[z0, z0],
-        #         mode="lines",
-        #         line=dict(color="green", width=2),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
+        for xh in xs_hatch:
+            fig.add_trace(go.Scatter3d(
+                x=[xh - 0.04 * w, xh + 0.04 * w],
+                y=[-h, -h - hatch_len],
+                z=[z0, z0],
+                mode="lines",
+                line=dict(color="green", width=2),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
 
-        # y_ground = Yb - 2 * r  # tangent to roller bottom
+        y_ground = Yb - 2 * r  # tangent to roller bottom
 
-        # # ground line
-        # fig.add_trace(go.Scatter3d(
-        #     x=[x1 - 1.3 * w, x1 + 1.3 * w],
-        #     y=[y_ground, y_ground],
-        #     z=[z1, z1],
-        #     mode="lines",
-        #     line=dict(color="green", width=4),
-        #     showlegend=False,
-        #     hoverinfo="skip"
-        # ))
+        # ground line
+        fig.add_trace(go.Scatter3d(
+            x=[x1 - 1.3 * w, x1 + 1.3 * w],
+            y=[y_ground, y_ground],
+            z=[z1, z1],
+            mode="lines",
+            line=dict(color="green", width=4),
+            showlegend=False,
+            hoverinfo="skip"
+        ))
 
-        # # hatch lines
-        # xs_hatch = np.linspace(x1 - 1.2 * w, x1 + 1.2 * w, n_hatch)
+        # hatch lines
+        xs_hatch = np.linspace(x1 - 1.2 * w, x1 + 1.2 * w, n_hatch)
 
-        # for xh in xs_hatch:
-        #     fig.add_trace(go.Scatter3d(
-        #         x=[xh - 0.04 * w, xh + 0.04 * w],
-        #         y=[y_ground, y_ground - hatch_len],
-        #         z=[z1, z1],
-        #         mode="lines",
-        #         line=dict(color="green", width=2),
-        #         showlegend=False,
-        #         hoverinfo="skip"
-        #     ))
+        for xh in xs_hatch:
+            fig.add_trace(go.Scatter3d(
+                x=[xh - 0.04 * w, xh + 0.04 * w],
+                y=[y_ground, y_ground - hatch_len],
+                z=[z1, z1],
+                mode="lines",
+                line=dict(color="green", width=2),
+                showlegend=False,
+                hoverinfo="skip"
+            ))
 
     # LAYOUT (POST-PROCESSOR STYLE)
 
@@ -1224,11 +1121,10 @@ class PlotWidget(QWidget):
 
         top.addStretch()
 
-        # self.web = QWebEngineView()
+        self.web = QWebEngineView()
 
-        # layout.addLayout(top)
-        # layout.addWidget(self.web)
         layout.addLayout(top)
+        layout.addWidget(self.web)
 
         self.update_plot()
 
@@ -1265,18 +1161,14 @@ class PlotWidget(QWidget):
             raise ValueError(f"Unsupported force: {force_key}")
 
         # -------- UPDATE VIEW --------
-        # self.web.load(QUrl.fromLocalFile(TEMP_HTML))
-        clean_path = os.path.abspath(TEMP_HTML)
-        webbrowser.open(f"file:///{clean_path}")
+        self.web.load(QUrl.fromLocalFile(TEMP_HTML))
 
 
 # ======================= MAIN
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = PlotWidget()
-    # w.resize(1200, 800)
-    w.resize(600,80)
-    w.setFixedSize(600,80)
+    w.resize(1200, 800)
     w.show()
     sys.exit(app.exec())
     sys.exit(app.exec())
