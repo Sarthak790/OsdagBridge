@@ -2,12 +2,17 @@ import sys
 import numpy as np
 import plotly.graph_objects as go
 import os
+
+# Disable GPU acceleration to prevent black screens on certain Windows drivers
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu"
+
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QCheckBox
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebEngineCore import QWebEngineSettings  # <-- Added for security settings
+from PySide6.QtCore import QUrl                         # <-- Added for URL loading
 
 # ============================================================
 # TOY DATASET SETUP
@@ -51,7 +56,7 @@ def get_mock_force(elem, comp, is_end_node=False):
     return 0.0
 
 # ============================================================
-# PLOTTING FUNCTIONS (NOW RETURNING HTML STRINGS)
+# PLOTTING FUNCTIONS
 # ============================================================
 def build_polyline(elem_list, comp_i, comp_j):
     xs, ys, zs, vals, node_ids = [], [], [], [], []
@@ -106,9 +111,8 @@ def build_figure_sfd(force_key):
 
     fig.update_layout(title="Toy Dataset: 3D Shear Force Diagram", scene=dict(aspectmode="auto"))
     
-    # RETURN STRING INSTEAD OF WRITING TO FILE
-    # Note: "cdn" requires an internet connection to load the Plotly library!
-    return fig.to_html(include_plotlyjs="cdn", full_html=True)
+    # Use include_plotlyjs=True to embed the JS directly (bypasses network/CORS issues)
+    return fig.to_html(include_plotlyjs=True, full_html=True)
 
 
 def build_figure_bmd(force_key, use_contour=False):
@@ -151,8 +155,8 @@ def build_figure_bmd(force_key, use_contour=False):
     title = "Toy Dataset: 3D BMD Contour View" if use_contour else "Toy Dataset: Interactive 3D BMD"
     fig.update_layout(title=title, scene=dict(aspectmode="auto"))
     
-    # RETURN STRING INSTEAD OF WRITING TO FILE
-    return fig.to_html(include_plotlyjs="cdn", full_html=True)
+    # Use include_plotlyjs=True to embed the JS directly
+    return fig.to_html(include_plotlyjs=True, full_html=True)
 
 # ============================================================
 # QT WIDGET
@@ -183,8 +187,17 @@ class PlotWidget(QWidget):
         top.addStretch()
 
         self.web = QWebEngineView()
+        
+        # --- FIX: LOWER SECURITY SHIELDS TO ALLOW PLOTLY RENDERING ---
+        self.web.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        self.web.settings().setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        self.web.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+        
         layout.addLayout(top)
         layout.addWidget(self.web)
+
+        # Temporary file path to pass to the WebEngine
+        self.temp_file_path = os.path.abspath("temp_gui_plot.html")
 
         self.update_plot()
 
@@ -207,22 +220,15 @@ class PlotWidget(QWidget):
             self.contour.setEnabled(True)
             html_string = build_figure_bmd(force_key, use_contour=self.contour.isChecked())
 
-        # INJECT HTML DIRECTLY INTO PYSIDE6
-        if html_string:
-            self.web.setHtml(html_string)
+        # WRITE HTML TO FILE AND LOAD IT VIA URL
+        # if html_string:
+        #     with open(self.temp_file_path, "w", encoding="utf-8") as f:
+        #         f.write(html_string)
             
-            # --- THE ESCAPE HATCH: OPEN IN REAL BROWSER ---
-            import webbrowser
-            import os
-            
-            debug_path = os.path.abspath("debug_plot.html")
-            with open(debug_path, "w", encoding="utf-8") as f:
-                f.write(html_string)
-                
-            print(f"Plot saved to: {debug_path}")
-            # Uncomment the next line if the PySide window is still black!
-            webbrowser.open(f"file:///{debug_path}")
-
+            # Use QUrl.fromLocalFile to safely pass the path to the internal browser
+            # self.web.load(QUrl.fromLocalFile(self.temp_file_path))
+        # Temporarily force a simple text render
+        self.web.setHtml("<h1 style='color: white; background: red;'>HELLO SARTHAK! IF YOU SEE THIS, WEBENGINE WORKS.</h1>")
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = PlotWidget()

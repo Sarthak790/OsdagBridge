@@ -232,8 +232,9 @@ def build_figure_sfd(ds, force_key):
 
     # girder_spacing = 3.0
 
-    for i, (gid, elems) in enumerate(girders.items()):
-
+    sorted_girders = sorted(girders.items(), key=lambda item: item[0])
+    for i, (z_val, elems) in enumerate(sorted_girders):
+        girder_name = f"G{i+1}"
         xs, ys, zs, vy, node_ids = build_polyline(elems, comp_i, comp_j)
 
         Vy = vy.astype(float)
@@ -293,6 +294,19 @@ def build_figure_sfd(ds, force_key):
                 for x, v, nid in zip(x_step, Vy_step, np.repeat(node_ids, 2)[1:-1])
             ],
             showlegend=False
+        ))
+
+        # ---------- GIRDER LABEL ----------
+        fig_sfd.add_trace(go.Scatter3d(  # Note: change fig_sfd to fig_bmd or fig depending on the function!
+            x=[xs[0]], 
+            y=[0], 
+            z=[zs[0]],
+            mode="text",
+            text=[f"<b>{girder_name}</b>"],
+            textposition="middle left",  # Places the text just before the start node
+            textfont=dict(size=14, color="black"),
+            showlegend=False,
+            hoverinfo="skip"
         ))
 
         # ---------- VERTICAL WALLS (CLIFFS) ----------
@@ -429,7 +443,7 @@ def build_figure_sfd(ds, force_key):
         #     ))
 
     fig_sfd.update_layout(
-        title="3D Shear Force Diagram",
+        # title="3D Shear Force Diagram",
         scene=dict(
 
             xaxis=dict(
@@ -544,7 +558,9 @@ def build_figure_bmd(ds, force_key):
     diffmzfull = max(mzfull)-min(mzfull)
     #factormz= abs(diffmzfull/diffxfull)*0.2
     '''
-    for gid, elems in girders.items():
+    sorted_girders = sorted(girders.items(), key=lambda item: item[0])
+    for i, (gid, elems) in enumerate(sorted_girders):
+        girder_name = f"G{i+1}"
         xs, ys, zs, mz, node_ids = build_polyline(elems, comp_i, comp_j)
         if max(mz) - min(mz) == 0:
             factormz = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - 0))
@@ -596,6 +612,19 @@ def build_figure_bmd(ds, force_key):
             ),
             showlegend=False,
             hoverinfo='skip'
+        ))
+
+        # ---------- GIRDER LABEL ----------
+        fig_bmd.add_trace(go.Scatter3d(
+            x=[xs[0]], 
+            y=[0], 
+            z=[zs[0]],
+            mode="text",
+            text=[f"<b>{girder_name}</b>"],
+            textposition="middle left",  # Pushes the text just behind the start node
+            textfont=dict(size=14, color="black"),
+            showlegend=False,
+            hoverinfo="skip"
         ))
 
         fig_bmd.add_trace(go.Scatter3d(
@@ -787,7 +816,7 @@ def build_figure_bmd(ds, force_key):
                 ]
             )
         ],
-        title="Interactive 3D BMD",
+        # title="Interactive 3D BMD",
 
         scene=dict(
 
@@ -918,7 +947,9 @@ def build_figure_bmd_contour(ds, force_key):
     fig = go.Figure()
     add_grillage_background(fig, nodes, members)
 
-    for gid, elems in girders.items():
+    sorted_girders = sorted(girders.items(), key=lambda item: item[0])
+    for i, (gid, elems) in enumerate(sorted_girders):
+        girder_name = f"G{i+1}"
         xs, ys, zs, mz, node_ids = build_polyline(elems, comp_i, comp_j)
         if max(mz) - min(mz) == 0:
             moment_scale = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - 0))
@@ -972,6 +1003,19 @@ def build_figure_bmd_contour(ds, force_key):
             line=dict(color="green", width=3),
             hoverinfo="skip",
             showlegend=False
+        ))
+
+        # ---------- GIRDER LABEL ----------
+        fig.add_trace(go.Scatter3d(
+            x=[xs[0]], 
+            y=[0], 
+            z=[zs[0]],
+            mode="text",
+            text=[f"<b>{girder_name}</b>"],
+            textposition="middle left",  # Pushes the text just behind the start node
+            textfont=dict(size=14, color="black"),
+            showlegend=False,
+            hoverinfo="skip"
         ))
 
         # ---------- DROPLINES FROM BASELINE TO BMD ----------
@@ -1097,7 +1141,7 @@ def build_figure_bmd_contour(ds, force_key):
     # LAYOUT (POST-PROCESSOR STYLE)
 
     fig.update_layout(
-        title="3D Bending Moment Diagram  Contour View",
+        # title="3D Bending Moment Diagram  Contour View",
 
         scene=dict(
 
