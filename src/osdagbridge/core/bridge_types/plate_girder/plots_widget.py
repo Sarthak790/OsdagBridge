@@ -1,6 +1,13 @@
 
 import sys
 import os
+
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+    "--ignore-gpu-blocklist "
+    "--enable-gpu-rasterization "
+    "--enable-webgl "
+    "--enable-transparent-visuals"
+)
 import webbrowser
 import openseespy.opensees as ops
 from pathlib import Path
@@ -9,6 +16,7 @@ from PySide6.QtWidgets import (
     QRadioButton, QButtonGroup, QLabel, QComboBox, QCheckBox
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6 import QtCore
 from PySide6.QtCore import QUrl
 
 import xarray as xr
@@ -1268,11 +1276,16 @@ class PlotWidget(QWidget):
 
         top.addStretch()
 
-        # self.web = QWebEngineView()
+        self.web = QWebEngineView()
+        self.web.page().setBackgroundColor(QtCore.Qt.transparent)
 
-        # layout.addLayout(top)
-        # layout.addWidget(self.web)
+        settings = self.web.settings()
+        # settings.setAttribute(QWebEngineSettings.WebGLEnabled, True)
+        # settings.setAttribute(QWebEngineSettings.Accelerated2dCanvasEnabled, True)
+        # settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
+
         layout.addLayout(top)
+        layout.addWidget(self.web)
 
         self.update_plot()
 
@@ -1309,9 +1322,9 @@ class PlotWidget(QWidget):
             raise ValueError(f"Unsupported force: {force_key}")
 
         # -------- UPDATE VIEW --------
-        # self.web.load(QUrl.fromLocalFile(TEMP_HTML))
         clean_path = os.path.abspath(TEMP_HTML)
-        webbrowser.open(f"file:///{clean_path}")
+        self.web.load(QUrl.fromLocalFile(clean_path))
+        # webbrowser.open(f"file:///{clean_path}")
 
 
 # ======================= MAIN
@@ -1319,8 +1332,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = PlotWidget()
     # w.resize(1200, 800)
-    w.resize(600,80)
-    w.setFixedSize(600,80)
+    w.resize(1200,800)
+    # w.setFixedSize(600,80)
     w.show()
-    sys.exit(app.exec())
     sys.exit(app.exec())
