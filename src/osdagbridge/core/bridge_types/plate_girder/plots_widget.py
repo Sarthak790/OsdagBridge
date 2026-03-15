@@ -251,10 +251,10 @@ def build_figure_sfd(ds, force_key):
         z_base = np.mean(zs)  # or zs[0]
 
         if max(Vy) - min(Vy) == 0:
-            shear_scale = 0.1 * abs((max(xs) - min(xs)) / (max(Vy) - 0))
+            shear_scale = 0.25 * abs((max(xs) - min(xs)) / (max(Vy) - 0))
 
         else:
-            shear_scale = 0.1 * abs((max(xs) - min(xs)) / (max(Vy) - min(Vy)))
+            shear_scale = 0.25* abs((max(xs) - min(xs)) / (max(Vy) - min(Vy)))
 
         # ---------- BASELINE (GROUND) -------------
         fig_sfd.add_trace(go.Scatter3d(
@@ -297,8 +297,8 @@ def build_figure_sfd(ds, force_key):
             text=[
                 # f"Girder {gid}"
                 f"<br>Node {nid}"
-                f"<br>X = {x:.3f}"
-                f"<br>{force_key} = {v:.3f}"
+                f"<br>X = {x:.2f}"
+                f"<br>{force_key} = {v:.2f}"
                 for x, v, nid in zip(x_step, Vy_step, np.repeat(node_ids, 2)[1:-1])
             ],
             showlegend=False
@@ -451,6 +451,18 @@ def build_figure_sfd(ds, force_key):
         #     ))
 
     fig_sfd.update_layout(
+        # --- ADD THIS PROFESSIONAL HOVER THEME ---
+        # --- ADD THIS PROFESSIONAL LIGHT BLUE THEME FOR SFD ---
+        hoverlabel=dict(
+            bgcolor="#E6F2FF",            # Very light, professional icy blue background
+            font_size=12,                 # Crisp, compact size
+            font_family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif", # Modern font stack
+            font_color="#2C3E50",         # Dark slate grey for high contrast and readability
+            bordercolor="#BBD6EE",        # Soft blue-grey border to frame the box
+            namelength=-1                 # Prevents text truncation
+        ),
+        # ------------------------------------------------------,
+        # ----------------------------------------
         # title="3D Shear Force Diagram",
         scene=dict(
 
@@ -470,14 +482,16 @@ def build_figure_sfd(ds, force_key):
             ),
 
             # aspectmode="data",
-            aspectmode="auto",
+            aspectmode="data",
             camera=dict(
                 eye=dict(x=1.6, y=1.2, z=1.6),
                 up=dict(x=0, y=1, z=0)
             ),
 
         ),
-        margin=dict(l=0, r=0, t=40, b=0)
+        margin=dict(l=0, r=0, t=40, b=0),
+        paper_bgcolor="white",  # Forces a solid web page background
+        plot_bgcolor="white"
     )
     fig_sfd.write_html(TEMP_HTML, include_plotlyjs=True, full_html=True)
 
@@ -590,7 +604,7 @@ def build_figure_bmd(ds, force_key):
         ))
         # --------------------------------
         hover_text = [
-            f"Node {nid}<br>X = {x:.3f}<br>{force_key} = {v:.3f}<br>Z = {z:.3f}"
+            f"Node {nid}<br>X = {x:.2f}<br>{force_key} = {v:.2f}<br>Z = {z:.2f}"
             for nid, x, v, z in zip(node_ids, xs, mz, zs)
         ]
 
@@ -769,6 +783,17 @@ def build_figure_bmd(ds, force_key):
     min_idx = [i for i, t in enumerate(fig_bmd.data) if t.legendgroup == "min_lines"]
 
     fig_bmd.update_layout(
+        # --- ADD THIS PROFESSIONAL HOVER THEME ---
+        hoverlabel=dict(
+            bgcolor="#FFE4E1",            # Light, professional red background (MistyRose)
+            font_size=12,                 # Crisp, compact size
+            font_family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif", # Modern font stack
+            font_color="#2C3E50",         # Dark slate grey for high contrast (more professional and readable than light text on a light background)
+            bordercolor="#CBD5E1",        # Light silver border
+            namelength=-1                 # Prevents text truncation
+        ),
+        # ----------------------------------------
+        
         updatemenus=[
             dict(
                 type="buttons",
@@ -997,7 +1022,7 @@ def build_figure_bmd_contour(ds, force_key):
             showlegend=False,
             hoverinfo="text",
             text=[
-                f"Node {nid}<br>X={x:.3f}<br>{force_key}={v:.3f}"
+                f"Node {nid}<br>X={x:.2f}<br>{force_key}={v:.2f}"
                 for nid, x, v in zip(node_ids, xs, mz)
             ]
         ))
@@ -1149,6 +1174,16 @@ def build_figure_bmd_contour(ds, force_key):
     # LAYOUT (POST-PROCESSOR STYLE)
 
     fig.update_layout(
+        # --- ADD THIS PROFESSIONAL HOVER THEME ---
+        hoverlabel=dict(
+            bgcolor="rgba(15, 23, 42, 0.95)",  # Deep slate/navy, slightly translucent (95%)
+            font_size=12,                      # Crisp, compact size
+            font_family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif", # Modern font stack
+            font_color="#F8F9FA",              # Crisp off-white text for readability
+            bordercolor="#0EA5E9",             # A subtle bright cyan border to tie into the contour's base colors
+            namelength=-1                      # Prevents text truncation
+        ),
+        # ----------------------------------------
         # title="3D Bending Moment Diagram  Contour View",
 
         scene=dict(
@@ -1277,7 +1312,7 @@ class PlotWidget(QWidget):
         top.addStretch()
 
         self.web = QWebEngineView()
-        self.web.page().setBackgroundColor(QtCore.Qt.transparent)
+        # self.web.page().setBackgroundColor(QtCore.Qt.transparent)
 
         settings = self.web.settings()
         # settings.setAttribute(QWebEngineSettings.WebGLEnabled, True)
