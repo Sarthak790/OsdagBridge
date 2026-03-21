@@ -94,6 +94,82 @@ def add_grillage_background(fig, nodes_dict, members_dict):
         hoverinfo='skip',
         showlegend=False
     ))
+def add_coordinate_triad(fig, nodes_dict):
+    """
+    Draws an elegant, CAD-style X-Y-Z triad near G1 with manual arrowheads.
+    All axes are styled with a uniform, thick Orange.
+    """
+    all_x = [n[0] for n in nodes_dict.values()]
+    all_z = [n[2] for n in nodes_dict.values()]
+
+    span_x = max(all_x) - min(all_x)
+    span_z = max(all_z) - min(all_z)
+    
+    # Scale the triad to be exactly 10% of the bridge's longest dimension
+    L = max(span_x, span_z) * 0.10  
+    if L == 0: L = 1.0
+
+    # Arrowhead length (20% of the axis length)
+    al = L * 0.20
+
+    # Anchor near G1 (min X, min Z)
+    # ox is shifted slightly positive (+0.04) to sit to the right of the text labels
+    # oz is shifted slightly negative (-0.06) so it doesn't intersect the G1 girder
+    ox = min(all_x) + (span_x * 0.04)
+    oy = 0
+    oz = min(all_z) - (span_z * 0.06)
+
+    cad_orange = "#E67E22"  # A vibrant, professional CAD orange
+    axis_width = 7          # Wider, bolder lines
+
+    # ==========================================
+    # 1. X-Axis (Longitudinal / +X)
+    # ==========================================
+    # Main line + Top arrowhead branch + Bottom arrowhead branch
+    x_x = [ox, ox + L, None, ox + L, ox + L - al, None, ox + L, ox + L - al]
+    x_y = [oy, oy, None, oy, oy + (al * 0.4), None, oy, oy - (al * 0.4)]
+    x_z = [oz, oz, None, oz, oz, None, oz, oz]
+
+    fig.add_trace(go.Scatter3d(
+        x=x_x, y=x_y, z=x_z, mode="lines",
+        line=dict(color=cad_orange, width=axis_width), hoverinfo="skip", showlegend=False
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[ox + L * 1.25], y=[oy], z=[oz], mode="text", text=["<b>X</b>"],
+        textfont=dict(color=cad_orange, size=14, family="Arial"), hoverinfo="skip", showlegend=False
+    ))
+
+    # ==========================================
+    # 2. Y-Axis (Vertical / +Y)
+    # ==========================================
+    y_x = [ox, ox, None, ox, ox + (al * 0.4), None, ox, ox - (al * 0.4)]
+    y_y = [oy, oy + L, None, oy + L, oy + L - al, None, oy + L, oy + L - al]
+    y_z = [oz, oz, None, oz, oz, None, oz, oz]
+
+    fig.add_trace(go.Scatter3d(
+        x=y_x, y=y_y, z=y_z, mode="lines",
+        line=dict(color=cad_orange, width=axis_width), hoverinfo="skip", showlegend=False
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[ox], y=[oy + L * 1.15], z=[oz], mode="text", text=["<b>Y</b>"],
+        textfont=dict(color=cad_orange, size=14, family="Arial"), hoverinfo="skip", showlegend=False
+    ))
+
+    # ==========================================
+    # 3. Z-Axis (Transverse / +Z towards G7)
+    # ==========================================
+    z_x = [ox, ox, None, ox, ox + (al * 0.4), None, ox, ox - (al * 0.4)]
+    z_y = [oy, oy, None, oy, oy, None, oy, oy]
+    z_z = [oz, oz + L, None, oz + L, oz + L - al, None, oz + L, oz + L - al]
+
+    fig.add_trace(go.Scatter3d(
+        x=z_x, y=z_y, z=z_z, mode="lines", 
+        line=dict(color=cad_orange, width=axis_width), hoverinfo="skip", showlegend=False
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[ox], y=[oy], z=[oz + L * 1.25], mode="text", text=["<b>Z</b>"],
+        textfont=dict(color=cad_orange, size=14, family="Arial"), hoverinfo="skip", showlegend=False
+    ))
 
 # ============================================================
 # SFD
@@ -152,6 +228,7 @@ def build_figure_sfd(ds, force_key):
 
     fig_sfd = go.Figure()
     add_grillage_background(fig_sfd, nodes, members)
+    add_coordinate_triad(fig_sfd, nodes)
 
     # =========================================================
     # MASTER LISTS FOR REDUCING LINE DRAW CALLS
@@ -170,7 +247,10 @@ def build_figure_sfd(ds, force_key):
         z_base = np.mean(zs) 
 
         if max(Vy) - min(Vy) == 0:
-            shear_scale = 0.25 * abs((max(xs) - min(xs)) / (max(Vy) - 0))
+            if max(Vy) == 0:
+                shear_scale = 1.0  # THE FIX: Safe fallback
+            else:
+                shear_scale = 0.25 * abs((max(xs) - min(xs)) / max(Vy))
         else:
             shear_scale = 0.25 * abs((max(xs) - min(xs)) / (max(Vy) - min(Vy)))
 
@@ -213,7 +293,7 @@ def build_figure_sfd(ds, force_key):
         master_label_x.append(xs[0])
         master_label_y.append(0)
         master_label_z.append(zs[0])
-        master_label_text.append(f"<b>{girder_name}</b>")
+        master_label_text.append(girder_name)
 
     # =========================================================
     # ADD MASTER TRACES (Hundreds of objects compressed into 4)
@@ -240,7 +320,7 @@ def build_figure_sfd(ds, force_key):
     # Add ALL labels as a single object
     fig_sfd.add_trace(go.Scatter3d( 
         x=master_label_x, y=master_label_y, z=master_label_z, mode="text", 
-        text=master_label_text, textposition="middle left", textfont=dict(size=14, color="black"),
+        text=master_label_text, textposition="middle left", textfont=dict(size=11, color="black"),
         showlegend=False, hoverinfo="skip"
     ))
 
@@ -254,12 +334,12 @@ def build_figure_sfd(ds, force_key):
             yaxis=dict(showbackground=False, showticklabels=False, title="", showspikes=False),
             zaxis=dict(showbackground=False, showticklabels=False, title="", showspikes=False, autorange="reversed"),
             aspectmode="data",
-            camera=dict(eye=dict(x=1.6, y=1.2, z=1.6), up=dict(x=0, y=1, z=0)),
+            camera=dict(eye=dict(x=-1.5, y=1.2, z=1.5), up=dict(x=0, y=1, z=0)),
         ),
         margin=dict(l=0, r=0, t=40, b=0),
         paper_bgcolor="white", plot_bgcolor="white"
     )
-    fig_sfd.write_html(TEMP_HTML, include_plotlyjs=True, full_html=True)
+    return fig_sfd.to_json()
 
 
 # ============================================================
@@ -319,36 +399,39 @@ def build_figure_bmd(ds, force_key):
 
     fig_bmd = go.Figure()
     add_grillage_background(fig_bmd, nodes, members)
+    add_coordinate_triad(fig_bmd, nodes)
 
-    # =========================================================
-    # MASTER LISTS FOR REDUCING DRAW CALLS
-    # =========================================================
     master_line_x, master_line_y, master_line_z = [], [], []
     master_base_x, master_base_y, master_base_z = [], [], []
     master_max_x, master_max_y, master_max_z = [], [], []
     master_min_x, master_min_y, master_min_z = [], [], []
     master_hover_text = []
     master_label_x, master_label_y, master_label_z, master_label_text = [], [], [], []
+    
+    # --- NEW: Dictionary to hold the data for the PySide6 Table ---
+    summary_data = {}
 
     sorted_girders = sorted(girders.items(), key=lambda item: item[0])
     for i, (gid, elems) in enumerate(sorted_girders):
         girder_name = f"G{i+1}"
         xs, ys, zs, mz, node_ids = build_polyline(elems, comp_i, comp_j)
+        
         if max(mz) - min(mz) == 0:
-            factormz = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - 0))
+            if max(mz) == 0:
+                factormz = 1.0
+            else:
+                factormz = 0.1 * abs((max(xs) - min(xs)) / max(mz))
         else:
             factormz = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - min(mz)))
             
         y_plot = mz * factormz 
         
-        # 1. ADD GO.SURFACE DIRECTLY (Preserving your exact look)
         fig_bmd.add_trace(go.Surface(
             x=[xs, xs], y=[np.zeros(len(xs)), y_plot], z=[zs, zs],
             surfacecolor=[[1]*len(xs), [1]*len(xs)], colorscale=[[0, 'red'], [1, 'red']],     
             opacity=0.2, showscale=False, hoverinfo="skip"
         ))
         
-        # 2. Append to Master Moment Line
         master_line_x.extend(list(xs) + [None])
         master_line_y.extend(list(y_plot) + [None])
         master_line_z.extend(list(zs) + [None])
@@ -359,65 +442,59 @@ def build_figure_bmd(ds, force_key):
         ]
         master_hover_text.extend(hover_text + [None])
 
-        # 3. Append to Master Baseline
         master_base_x.extend([xs[0], xs[-1], None])
         master_base_y.extend([0, 0, None])
         master_base_z.extend([zs[0], zs[0], None])
 
-        # 4. Append to Master Text Labels
         master_label_x.append(xs[0])
         master_label_y.append(0)
         master_label_z.append(zs[0])
-        master_label_text.append(f"<b>{girder_name}</b>")
+        master_label_text.append(girder_name)
 
-        # 5. Append to Master MAX lines
         idx_max = np.argmax(mz)
+        max_val = max(mz)
         master_max_x.extend([xs[idx_max], xs[idx_max], None])
-        master_max_y.extend([0, max(mz) * factormz, None])
+        master_max_y.extend([0, max_val * factormz, None])
         master_max_z.extend([zs[0], zs[0], None])
 
-        # 6. Append to Master MIN lines
         idx_min = np.argmin(mz)
+        min_val = min(mz)
         master_min_x.extend([xs[idx_min], xs[idx_min], None])
-        master_min_y.extend([0, min(mz) * factormz, None])
+        master_min_y.extend([0, min_val * factormz, None])
         master_min_z.extend([zs[0], zs[0], None])
+        
+        # --- NEW: Save the exact values for the UI panel ---
+        summary_data[girder_name] = {"max": max_val, "min": min_val}
 
-    # =========================================================
-    # ADD MASTER TRACES (Hundreds of objects compressed down)
-    # =========================================================
-
-    # Add ALL moment lines and markers as a single object
     fig_bmd.add_trace(go.Scatter3d(
-        x=master_line_x, y=master_line_y, z=master_line_z, mode='lines+markers', line=dict(color="red", width=4),
-        marker=dict(size=3, color="red"), showlegend=False, text=master_hover_text, hoverinfo="text"
+        x=master_line_x, y=master_line_y, z=master_line_z, mode='lines', line=dict(color="red", width=4),
+        showlegend=False, text=master_hover_text, hoverinfo="text"
     ))
 
-    # Add ALL baselines as a single object
     fig_bmd.add_trace(go.Scatter3d(
         x=master_base_x, y=master_base_y, z=master_base_z, mode='lines',
         line=dict(color="green", width=3, dash='solid'), showlegend=False, hoverinfo='skip'
     ))
 
-    # Add ALL labels as a single object
     fig_bmd.add_trace(go.Scatter3d(
         x=master_label_x, y=master_label_y, z=master_label_z, mode="text", text=master_label_text,
-        textposition="middle left", textfont=dict(size=14, color="black"),
+        textposition="middle left", textfont=dict(size=11, color="black"),
         showlegend=False, hoverinfo="skip"
     ))
 
-    # Add ALL MAX lines as a single hidden object
+    # The Black indicator lines remain, but the 3D text is permanently gone
     fig_bmd.add_trace(go.Scatter3d(
         x=master_max_x, y=master_max_y, z=master_max_z, mode="lines", line=dict(color="black", width=3),
         legendgroup="max_lines", showlegend=False, visible=False, hoverinfo="skip"
     ))
-
-    # Add ALL MIN lines as a single hidden object
+    
     fig_bmd.add_trace(go.Scatter3d(
         x=master_min_x, y=master_min_y, z=master_min_z, mode="lines", line=dict(color="black", width=3),
         legendgroup="min_lines", showlegend=False, visible=False, hoverinfo="skip"
     ))
 
     fig_bmd.update_layout(
+        uirevision="constant_view",
         hoverlabel=dict(
             bgcolor="#FFE4E1", font_size=12, font_family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif", 
             font_color="#2C3E50", bordercolor="#CBD5E1", namelength=-1                
@@ -436,22 +513,27 @@ def build_figure_bmd(ds, force_key):
                         args=[{"visible": [True if t.legendgroup == "min_lines" else t.visible for t in fig_bmd.data]}],
                         args2=[{"visible": [False if t.legendgroup == "min_lines" else t.visible for t in fig_bmd.data]}]
                     ),
+                    dict(
+                        label="SUMMARY", method="relayout",
+                        args=[{"meta": "SHOW_SUMMARY"}] 
+                    ),
                 ]
             )
         ],
         scene=dict(
-            camera=dict(up=dict(x=0, y=0.5, z=0)),
-            xaxis=dict(title="girder length", showbackground=False, showgrid=False, zeroline=False, visible=False),
-            yaxis=dict(title="Mz values", showbackground=True, backgroundcolor="rgba(200,200,200,0.15)", showgrid=False, zeroline=False, visible=False),
-            zaxis=dict(showbackground=False, showgrid=False, zeroline=False, visible=False, autorange="reversed"),
+            camera=dict(up=dict(x=0, y=1, z=0),eye=dict(x=-1.5, y=1.2, z=1.5)),
+            xaxis=dict(title="girder length", showbackground=False, showgrid=False, zeroline=False, visible=False, showspikes=False),
+            yaxis=dict(title="Mz values", showbackground=True, backgroundcolor="rgba(200,200,200,0.15)", showgrid=False, zeroline=False, visible=False, showspikes=False),
+            zaxis=dict(showbackground=False, showgrid=False, zeroline=False, visible=False, autorange="reversed", showspikes=False),
             aspectmode='data',
         ),
-        # --- THE ANTI-FLICKER BACKGROUND FIX ---
         paper_bgcolor="white",
         plot_bgcolor="white",
         margin=dict(l=0, r=0, t=40, b=0)
     )
-    fig_bmd.write_html(TEMP_HTML, include_plotlyjs=True, full_html=True)
+    
+    # --- NEW: Return a tuple containing the plot and the data ---
+    return fig_bmd.to_json(), summary_data
 
 
 # ============================================================
@@ -517,60 +599,78 @@ def build_figure_bmd_contour(ds, force_key):
 
     fig = go.Figure()
     add_grillage_background(fig, nodes, members)
+    add_coordinate_triad(fig, nodes)
 
     # =========================================================
     # MASTER LISTS FOR REDUCING DRAW CALLS
     # =========================================================
     master_drop_x, master_drop_y, master_drop_z, master_drop_color = [], [], [], []
+    master_drop_text = []  # <--- Added list for dropline text
     master_base_x, master_base_y, master_base_z = [], [], []
 
     sorted_girders = sorted(girders.items(), key=lambda item: item[0])
     for i, (gid, elems) in enumerate(sorted_girders):
         girder_name = f"G{i+1}"
         xs, ys, zs, mz, node_ids = build_polyline(elems, comp_i, comp_j)
+        
+        # Safe math to prevent zero-division
         if max(mz) - min(mz) == 0:
-            moment_scale = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - 0))
+            if max(mz) == 0:
+                moment_scale = 1.0
+            else:
+                moment_scale = 0.1 * abs((max(xs) - min(xs)) / max(mz))
         else:
             moment_scale = 0.1 * abs((max(xs) - min(xs)) / (max(mz) - min(mz)))
             
         y_plot = mz * moment_scale
-
-        # 1. Add Translucent Surface (Must remain per girder)
+        
+        # 1. Translucent Surface (HOVER STRICTLY OFF)
         fig.add_trace(go.Surface(
             x=[xs, xs], y=[np.zeros(len(xs)), y_plot], z=[zs, zs],
             surfacecolor=[mz, mz], colorscale="Jet", cmin=min(mzfull), cmax=max(mzfull),
             opacity=0.4, showscale=False, hoverinfo="skip"
         ))
 
-        # 2. Add Top Contour Line (Must remain per girder for hover text mapping)
+        # 2. Top Contour Line (WITH MASSIVE INVISIBLE HITBOXES)
         fig.add_trace(go.Scatter3d(
-            x=xs, y=y_plot, z=zs, mode="lines",
+            x=xs, y=y_plot, z=zs, 
+            mode="lines+markers", 
             line=dict(width=6, color=mz, colorscale="Jet", cmin=min(mzfull), cmax=max(mzfull)),
-            showlegend=False, hoverinfo="text",
-            text=[f"Node {nid}<br>X={x:.2f}<br>{force_key}={v:.2f}" for nid, x, v in zip(node_ids, xs, mz)]
+            
+            # --- THE MAGIC HITBOX ---
+            marker=dict(size=12, opacity=0), 
+            # ------------------------
+            
+            showlegend=False, 
+            text=[f"Node {nid}<br>X={x:.2f}<br>{force_key}={v:.2f}" for nid, x, v in zip(node_ids, xs, mz)],
+            hoverinfo="text"
         ))
 
-        # 3. Add Girder Text Label
+        # 3. Girder Text Label
         fig.add_trace(go.Scatter3d(
             x=[xs[0]], y=[0], z=[zs[0]], mode="text", text=[f"<b>{girder_name}</b>"],
             textposition="middle left", textfont=dict(size=14, color="black"),
             showlegend=False, hoverinfo="skip"
         ))
 
-        # 4. Append to Master Baseline
+        # 4. Master Baseline
         master_base_x.extend([xs[0], xs[-1], None])
         master_base_y.extend([0, 0, None])
         master_base_z.extend([zs[0], zs[0], None])
 
-        # 5. Append to Master Droplines
-        for xi, zi, mzi in zip(xs, zs, mz):
+        # 5. Master Droplines (Added node_ids to the loop to map text perfectly)
+        for xi, zi, mzi, nid in zip(xs, zs, mz, node_ids):
             master_drop_x.extend([xi, xi, None])
             master_drop_y.extend([0, mzi * moment_scale, None])
             master_drop_z.extend([zi, zi, None])
             master_drop_color.extend([mzi, mzi, mzi])
+            
+            # Add text to the top, bottom, and gap of every dropline
+            htext = f"Node {nid}<br>X={xi:.2f}<br>{force_key}={mzi:.2f}"
+            master_drop_text.extend([htext, htext, None])
 
     # =========================================================
-    # ADD MASTER TRACES (Hundreds of objects compressed into 2)
+    # ADD MASTER TRACES
     # =========================================================
     
     # Add ALL baselines as a single object
@@ -579,11 +679,19 @@ def build_figure_bmd_contour(ds, force_key):
         line=dict(color="green", width=3), hoverinfo="skip", showlegend=False
     ))
 
-    # Add ALL droplines as a single object
+    # Add ALL droplines as a single object (WITH MASSIVE INVISIBLE HITBOXES)
     fig.add_trace(go.Scatter3d(
-        x=master_drop_x, y=master_drop_y, z=master_drop_z, mode="lines",
+        x=master_drop_x, y=master_drop_y, z=master_drop_z, 
+        mode="lines+markers",
         line=dict(width=4, color=master_drop_color, colorscale="Jet", cmin=min(mzfull), cmax=max(mzfull)),
-        showlegend=False, hoverinfo="skip"
+        
+        # --- THE MAGIC HITBOX ---
+        marker=dict(size=12, opacity=0), 
+        # ------------------------
+        
+        showlegend=False, 
+        text=master_drop_text,
+        hoverinfo="text"
     ))
 
     fig.update_layout(
@@ -592,16 +700,15 @@ def build_figure_bmd_contour(ds, force_key):
             font_color="#F8F9FA", bordercolor="#0EA5E9", namelength=-1                      
         ),
         scene=dict(
-            camera=dict(up=dict(x=0, y=1, z=0)),
-            xaxis=dict(title="girder length", showbackground=False, showgrid=False, zeroline=False, visible=False),
-            yaxis=dict(title="Mz values", showbackground=True, backgroundcolor="rgba(200,200,200,0.15)", showgrid=False, zeroline=False, visible=False),
-            zaxis=dict(showbackground=False, showgrid=False, zeroline=False, visible=False, autorange="reversed"),
+            camera=dict(up=dict(x=0, y=1, z=0),eye=dict(x=-1.5, y=1.2, z=1.5)),
+            xaxis=dict(title="girder length", showbackground=False, showgrid=False, zeroline=False, showspikes=False, visible=False),
+            yaxis=dict(title="Mz values", showbackground=True, backgroundcolor="rgba(200,200,200,0.15)", showgrid=False, zeroline=False, showspikes=False, visible=False),
+            zaxis=dict(showbackground=False, showgrid=False, zeroline=False, showspikes=False, visible=False, autorange="reversed"),
             aspectmode='data',
         ),
-        # --- THE ANTI-FLICKER BACKGROUND FIX ---
         paper_bgcolor="white",
         plot_bgcolor="white",
         margin=dict(l=0, r=0, t=40, b=0)
     )
     
-    fig.write_html(TEMP_HTML, include_plotlyjs=True, full_html=True)
+    return fig.to_json()
