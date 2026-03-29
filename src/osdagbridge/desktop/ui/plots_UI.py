@@ -2,7 +2,8 @@ import sys
 import os
 import json
 
-# Performance Flags
+# Performance Flags: Tuned for Screen Recording / Meetings on Windows
+os.environ["QT_OPENGL"] = "software"
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
     "--ignore-gpu-blocklist "
     "--enable-gpu-rasterization "
@@ -10,6 +11,7 @@ os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
     "--enable-transparent-visuals "
     "--disable-software-rasterizer "
     "--disable-gpu-driver-bug-workarounds"
+    "--use-angle=d3d11 "
 )
 
 from PySide6.QtWidgets import (
@@ -19,31 +21,101 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
-from PySide6.QtCore import QUrl, Qt, QPoint
-from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEnginePage
+from PySide6.QtCore import QUrl, Qt, QPoint, QObject, Slot, Signal
+from PySide6.QtWebChannel import QWebChannel
 
 # --- IMPORT THE BACKEND LOGIC ---
+# Notice we no longer need TEMP_DIR!
 from osdagbridge.core.bridge_types.plate_girder.plots_logic import (
     build_figure_sfd, 
     build_figure_bmd, 
     build_figure_bmd_contour, 
     get_ds, 
     LOADCASES, 
-    FORCE_MAP, 
-    TEMP_DIR
+    FORCE_MAP
 )
-class BridgeWebPage(QWebEnginePage):
-    """A custom web page that secretly listens to the JavaScript console."""
-    def __init__(self, parent_widget):
-        super().__init__(parent_widget)
-        self.parent_widget = parent_widget
 
-    def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
-        # Use 'in' to ignore hidden newline characters or quotes
-        if "TRIGGER_SUMMARY_DIALOG" in message:
-            self.parent_widget.show_summary_dialog()
-            
-        super().javaScriptConsoleMessage(level, message, lineNumber, sourceID)
+# =========================================================
+# THE RAM-ONLY FRONTEND
+# =========================================================
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background-color: white; overflow: hidden; }
+        #plot_div { width: 100vw; height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="plot_div"></div>
+
+    <script>
+        var pyBackend = null;
+
+        // Initialize QWebChannel
+        new QWebChannel(qt.webChannelTransport, function(channel) {
+            pyBackend = channel.objects.backend;
+
+            // Listen for data from Python
+            pyBackend.newPlotData.connect(function(jsonString) {
+                renderPlot(jsonString);
+            });
+
+            // Tell Python the page is ready
+            pyBackend.pageReady();
+        });
+
+        function renderPlot(jsonString) {
+            var figure = JSON.parse(jsonString);
+            var config = { displayModeBar: true, responsive: true };
+
+            Plotly.react('plot_div', figure.data, figure.layout, config).then(function() {
+                var targetDiv = document.getElementById('plot_div');
+                Plotly.Plots.resize(targetDiv);
+
+                if (!targetDiv.hasRelayoutListener) {
+                    targetDiv.on('plotly_relayout', function(eventdata) {
+                        var eventString = JSON.stringify(eventdata);
+                        if (eventString && eventString.includes('SHOW_SUMMARY')) {
+                            // Call Python natively! No console hacks.
+                            pyBackend.requestSummaryDialog();
+                            setTimeout(function() {
+                                Plotly.relayout('plot_div', {meta: "CLEAR"});
+                            }, 100);
+                        }
+                    });
+                    targetDiv.hasRelayoutListener = true;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+"""
+
+class BridgeBackend(QObject):
+    """The QWebChannel translator between Python and JavaScript."""
+    
+    # Signal: Python uses this to push JSON data to JavaScript
+    newPlotData = Signal(str)
+
+    def __init__(self, main_app):
+        super().__init__()
+        self.main_app = main_app
+
+    @Slot()
+    def pageReady(self):
+        """JavaScript calls this when the page is fully loaded."""
+        self.main_app.update_plot()
+
+    @Slot()
+    def requestSummaryDialog(self):
+        """JavaScript calls this when the 'SUMMARY' button is clicked."""
+        self.main_app.show_summary_dialog()
+
 
 class SummaryDialog(QDialog):
     """A floating tool palette that hovers over the main UI without disturbing it."""
@@ -51,8 +123,6 @@ class SummaryDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Extreme Values")
         
-        # Qt.Tool makes it a neat floating palette. 
-        # WindowStaysOnTopHint prevents it from hiding behind the main app.
         self.setWindowFlags(Qt.Tool | Qt.WindowStaysOnTopHint)
         self.resize(350, 250)
         
@@ -107,29 +177,33 @@ class PlotWidget(QWidget):
         self.contour.stateChanged.connect(self.update_plot)
         top.addWidget(self.contour)
         
-        # ---------- THE NEW DIALOG BUTTON ----------
-        # self.btn_summary = QPushButton("Max/Min Values")
-        # self.btn_summary.clicked.connect(self.show_summary_dialog)
-        # top.addWidget(self.btn_summary)
-
         top.addStretch()
         layout.addLayout(top)
 
         # ---------- MAIN BROWSER AREA ----------
         self.web = QWebEngineView()
-        self.custom_page = BridgeWebPage(self)
-        self.web.setPage(self.custom_page)
+        
+        # Stops Qt from painting a blank background behind the web viewer
+        self.web.setAttribute(Qt.WA_OpaquePaintEvent)
+        self.web.setAttribute(Qt.WA_NoSystemBackground)
+        self.web.page().setBackgroundColor(Qt.white)
+
         settings = self.web.settings()
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         layout.addWidget(self.web)
 
-        # ---------- INITIALIZATION ----------
-        self.stats_dict = {}  # Store the latest data here
+        # ---------- INITIALIZATION & QWEBCHANNEL ----------
+        self.stats_dict = {}  
         self.summary_dialog = SummaryDialog(self)
 
-        base_html_path = str(TEMP_DIR / "base_plot.html")
-        self.web.load(QUrl.fromLocalFile(base_html_path))
-        self.web.loadFinished.connect(self.update_plot)
+        self.channel = QWebChannel()
+        self.backend = BridgeBackend(self)
+        
+        self.channel.registerObject("backend", self.backend)
+        self.web.page().setWebChannel(self.channel)
+
+        # Inject HTML directly into memory
+        self.web.setHtml(HTML_TEMPLATE, QUrl("qrc:/"))
 
     def show_summary_dialog(self):
         """Pops up the dialog perfectly in the top-left corner of the web view."""
@@ -138,11 +212,8 @@ class PlotWidget(QWidget):
             
         self.summary_dialog.update_data(self.stats_dict)
         self.summary_dialog.show()
-        
-        # --- NEW: FORCE THE DIALOG TO THE FRONT ---
         self.summary_dialog.raise_()
         self.summary_dialog.activateWindow()
-        # ------------------------------------------
         
         # Calculate exactly where the top-left of the 3D plot is on the screen
         top_left_corner = self.web.mapToGlobal(QPoint(15, 15))
@@ -162,35 +233,27 @@ class PlotWidget(QWidget):
             self.contour.setEnabled(False)
             self.contour.blockSignals(False)
             
-            # Disable the button for SFD since we aren't tracking stats for it yet
-            # self.btn_summary.setEnabled(False) 
             self.stats_dict = {}
-            
             plot_json = build_figure_sfd(ds, force_key)
 
         elif is_moment:
             self.contour.setEnabled(True)
-            # self.btn_summary.setEnabled(True) # Re-enable the button
             
             if self.contour.isChecked():
-                # Note: If you want stats for the contour plot too, you'll need to 
-                # update the contour function to return the stats dict later!
                 plot_json = build_figure_bmd_contour(ds, force_key)
                 self.stats_dict = {}
             else:
                 plot_json, self.stats_dict = build_figure_bmd(ds, force_key)
                 
-                # If the dialog is currently open, dynamically update the numbers
                 if self.summary_dialog.isVisible():
                     self.summary_dialog.update_data(self.stats_dict)
 
         else:
             raise ValueError(f"Unsupported force: {force_key}")
 
-        # -------- INJECT PLOT --------
-        safe_json = json.dumps(plot_json) 
-        js_command = f"updatePlotFromPython({safe_json});"
-        self.web.page().runJavaScript(js_command)
+        # -------- INJECT PLOT VIA QWEBCHANNEL --------
+        # Emits the raw JSON string perfectly without double-encoding it
+        self.backend.newPlotData.emit(plot_json)
 
 
 # ======================= MAIN
